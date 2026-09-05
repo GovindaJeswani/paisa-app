@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Trash2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, X, Trash2, AlertTriangle, CheckCircle2, TrendingUp, TrendingDown } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { db } from "@/lib/db";
 import { cn, formatCurrency, generateId, clampPercent } from "@/lib/utils";
@@ -35,9 +35,22 @@ export default function BudgetsPage() {
       const pct = b.amount > 0 ? (spent / b.amount) * 100 : 0;
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
       const dayOfMonth = now.getDate();
-      const expectedPct = (dayOfMonth / daysInMonth) * 100;
-      const isOverPace = pct > expectedPct + 10;
-      return { budget: b, spent, remaining, pct, isOverPace };
+      const daysLeft = Math.max(1, daysInMonth - dayOfMonth);
+      const dailyPace = dayOfMonth > 0 ? spent / dayOfMonth : 0;
+      const expectedPace = b.amount / daysInMonth;
+      const projectedTotal = Math.round(dailyPace * daysInMonth);
+      const projectedOverspend = Math.max(0, projectedTotal - b.amount);
+      const isOverPace = dailyPace > expectedPace * 1.15;
+      const isOver = pct >= 100;
+
+      // Intelligent message
+      let message: string;
+      if (isOver) message = `Over budget by ${formatCurrency(spent - b.amount)}`;
+      else if (pct >= 80) message = `${Math.round(pct)}% used with ${daysLeft} days left${projectedOverspend > 0 ? `. May exceed by ~${formatCurrency(projectedOverspend)}` : ""}`;
+      else if (isOverPace) message = `Spending faster than expected — pace: ~${formatCurrency(projectedTotal)}/month`;
+      else message = `${formatCurrency(remaining)} left for ${daysLeft} days (~${formatCurrency(Math.round(remaining / daysLeft))}/day)`;
+
+      return { budget: b, spent, remaining, pct, isOverPace, isOver, daysLeft, message, projectedOverspend };
     });
   }, [budgets, monthTxns, now]);
 
@@ -120,11 +133,10 @@ export default function BudgetsPage() {
 
       {/* Budget cards */}
       <div className="space-y-3 stagger-children">
-        {budgetProgress.map(({ budget, spent, remaining, pct, isOverPace }) => {
+        {budgetProgress.map(({ budget, spent, remaining, pct, isOverPace, isOver, daysLeft, message, projectedOverspend }) => {
           const cat = budget.categoryId ? categories.find((c) => c.id === budget.categoryId) : null;
           const radius = 32; const circumference = 2 * Math.PI * radius;
           const offset = circumference - (clampPercent(pct) / 100) * circumference;
-          const isOver = pct >= 100;
 
           return (
             <div key={budget.id} className="card-elevated p-4">
@@ -158,14 +170,15 @@ export default function BudgetsPage() {
                     <span className="text-text-secondary">of <span className="font-bold tabular-nums">{formatCurrency(budget.amount)}</span></span>
                   </div>
 
-                  <div className="mt-1.5 text-xs">
-                    {isOver ? (
-                      <div className="flex items-center gap-1 text-expense"><AlertTriangle size={12} /> Over budget by {formatCurrency(spent - budget.amount)}</div>
-                    ) : isOverPace ? (
-                      <div className="flex items-center gap-1 text-warning"><AlertTriangle size={12} /> Spending faster than expected</div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-income"><CheckCircle2 size={12} /> {formatCurrency(remaining)} remaining</div>
-                    )}
+                  <div className="mt-1.5 text-[11px] leading-relaxed">
+                    <div className={cn("flex items-start gap-1",
+                      isOver ? "text-expense" : isOverPace ? "text-warning" : "text-income"
+                    )}>
+                      {isOver ? <AlertTriangle size={12} className="shrink-0 mt-0.5" /> :
+                       isOverPace ? <AlertTriangle size={12} className="shrink-0 mt-0.5" /> :
+                       <CheckCircle2 size={12} className="shrink-0 mt-0.5" />}
+                      <span>{message}</span>
+                    </div>
                   </div>
                 </div>
               </div>
