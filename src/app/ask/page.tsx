@@ -17,14 +17,16 @@ interface Message {
 const SUGGESTIONS = [
   "How much did I spend on food this month?",
   "Who owes me money?",
-  "What are my subscriptions?",
   "What's my biggest expense?",
+  "Am I within my food budget?",
   "How much did I save?",
   "Can I afford ₹15,000?",
-  "Compare this month summary",
-  "What are my goals?",
-  "Show my budget status",
-  "What's my balance?",
+  "Compare this month with last month",
+  "What are my subscriptions?",
+  "How much do I spend on weekends?",
+  "What's safe to spend today?",
+  "Show my goal progress",
+  "What did I spend this week?",
 ];
 
 export default function AskPage() {
@@ -129,9 +131,21 @@ export default function AskPage() {
                 {/* Transaction previews */}
                 {msg.result?.transactions && msg.result.transactions.length > 0 && (
                   <div className="mt-2 border-t border-border-light pt-2">
-                    <p className="text-[10px] text-text-tertiary mb-1">Recent transactions:</p>
+                    <p className="text-[10px] text-text-tertiary mb-1">Top transactions:</p>
                     {msg.result.transactions.slice(0, 3).map((t) => (
                       <TransactionCard key={t.id} transaction={t} compact />
+                    ))}
+                  </div>
+                )}
+
+                {/* Follow-up suggestions */}
+                {msg.result?.followUp && msg.result.followUp.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {msg.result.followUp.map((f) => (
+                      <button key={f} onClick={() => handleSend(f)}
+                        className="rounded-full border border-border-light bg-surface px-2 py-0.5 text-[10px] text-text-secondary hover:bg-surface-secondary transition-colors">
+                        {f}
+                      </button>
                     ))}
                   </div>
                 )}

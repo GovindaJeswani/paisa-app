@@ -2,12 +2,13 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Users, Trash2, Check, Divide } from "lucide-react";
+import { Plus, X, Users, Trash2, Check, Divide, Contact } from "lucide-react";
 import { db } from "@/lib/db";
 import { cn, formatCurrency, generateId } from "@/lib/utils";
 import { usePersons } from "@/lib/hooks/use-persons";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { Group, Split, SplitShare } from "@/lib/types";
+import { isContactPickerSupported, pickContacts } from "@/lib/engine/contacts";
+import type { Group, Split, SplitShare, Person } from "@/lib/types";
 
 export default function SplitsPage() {
   const persons = usePersons();
@@ -125,8 +126,29 @@ export default function SplitsPage() {
                       {p.name} {selectedMembers.includes(p.id) ? "✓" : ""}
                     </button>
                   ))}
+                  {/* Contact Picker — works on Android Chrome */}
+                  {isContactPickerSupported() && (
+                    <button onClick={async () => {
+                      try {
+                        const contacts = await pickContacts(true);
+                        for (const c of contacts) {
+                          const existing = persons.find((p) => p.name.toLowerCase() === c.name.toLowerCase());
+                          if (!existing) {
+                            const newPerson: Person = { id: generateId(), name: c.name, phone: c.phone, email: c.email, netBalance: 0, createdAt: new Date().toISOString() };
+                            await db.persons.add(newPerson);
+                            setSelectedMembers((prev) => [...prev, newPerson.id]);
+                          } else {
+                            setSelectedMembers((prev) => prev.includes(existing.id) ? prev : [...prev, existing.id]);
+                          }
+                        }
+                      } catch { /* user cancelled */ }
+                    }}
+                      className="rounded-full px-3 py-1.5 text-xs font-medium border border-dashed border-accent text-accent hover:bg-accent-light transition-all flex items-center gap-1">
+                      <Contact size={12} /> From Contacts
+                    </button>
+                  )}
                 </div>
-                {persons.length === 0 && <p className="text-[10px] text-text-tertiary mt-1">Add people in the People tab first</p>}
+                {persons.length === 0 && !isContactPickerSupported() && <p className="text-[10px] text-text-tertiary mt-1">Add people in the People tab first</p>}
               </div>
               <button onClick={handleCreateGroup} disabled={!groupName.trim() || selectedMembers.length === 0}
                 className="w-full rounded-xl bg-accent py-2.5 text-sm font-semibold text-text-inverse disabled:opacity-50">Create Group</button>
