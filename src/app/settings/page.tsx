@@ -226,7 +226,7 @@ export default function SettingsPage() {
       </SettingsSection>
 
       {/* Privacy */}
-      <SettingsSection title="Privacy">
+      <SettingsSection title="Privacy & Security">
         <div className="rounded-xl border border-border-light bg-surface p-4">
           <div className="flex items-start gap-3">
             <Shield size={18} className="text-accent mt-0.5 shrink-0" />
@@ -235,60 +235,44 @@ export default function SettingsPage() {
                 Your data stays on your device
               </p>
               <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-                Paisa stores all your financial data locally in your browser.
-                Nothing is sent to any server. No account required. No tracking.
+                All financial data is stored locally in your browser. Nothing is uploaded to any server. No account needed. No tracking. No ads.
               </p>
             </div>
           </div>
         </div>
-      </SettingsSection>
-
-      {/* Capabilities */}
-      <SettingsSection title="What Works">
-        <div className="space-y-1.5">
+        <div className="mt-2 space-y-1.5 px-1">
           {[
-            { status: true, label: "Add transactions via natural language" },
-            { status: true, label: "Paste bank SMS to import transactions" },
-            { status: true, label: "Upload CSV bank statements" },
-            { status: true, label: "Scan receipts with OCR (Tesseract.js)" },
-            { status: true, label: "Calendar with financial indicators" },
-            { status: true, label: "Ask Paisa — financial questions" },
-            { status: true, label: "Budgets, Goals, Splits, Lending" },
-            { status: true, label: "Export as CSV, JSON, or printable statement" },
-            { status: true, label: "Install as app (PWA)" },
-            { status: true, label: "Works offline after first load" },
-            { status: true, label: "Dark / Light theme" },
+            { icon: "🔒", text: "Zero data leaves your device" },
+            { icon: "🚫", text: "No sign-up or account required" },
+            { icon: "📡", text: "Works offline after first load" },
+            { icon: "💾", text: "Export anytime as JSON or CSV backup" },
           ].map((item) => (
-            <div key={item.label} className="flex items-center gap-2 text-xs">
-              <span className="text-income">✓</span>
-              <span className="text-text-secondary">{item.label}</span>
+            <div key={item.text} className="flex items-center gap-2.5 text-xs text-text-secondary">
+              <span>{item.icon}</span>
+              <span>{item.text}</span>
             </div>
           ))}
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Requires Native Android App">
-        <div className="rounded-xl border border-warning/20 bg-warning-light p-3">
-          <p className="text-xs text-text-secondary leading-relaxed">
-            These features need a native Android app (not possible in a browser PWA):
-          </p>
-          <div className="space-y-1.5 mt-2">
-            {[
-              "Automatic SMS reading in background",
-              "Gmail auto-import via OAuth",
-              "Push notifications",
-              "Google Drive backup sync",
-              "Background bank statement detection",
-            ].map((item) => (
-              <div key={item} className="flex items-center gap-2 text-xs">
-                <span className="text-warning">○</span>
-                <span className="text-text-tertiary">{item}</span>
+      {/* How to add transactions */}
+      <SettingsSection title="Ways to Add Transactions">
+        <div className="space-y-1.5">
+          {[
+            { icon: "💬", title: "Type naturally", desc: "\"Spent 300 on lunch\" — Paisa understands" },
+            { icon: "📱", title: "Paste bank SMS", desc: "Copy bank messages → paste → auto-import" },
+            { icon: "📄", title: "Upload CSV", desc: "Import bank statements (HDFC, SBI, ICICI, Axis)" },
+            { icon: "📸", title: "Scan receipts", desc: "Take a photo — OCR extracts amount & merchant" },
+            { icon: "➕", title: "Quick add", desc: "Tap + for instant entry" },
+          ].map((item) => (
+            <div key={item.title} className="flex items-start gap-3 rounded-xl border border-border-light bg-surface p-3">
+              <span className="text-base mt-0.5">{item.icon}</span>
+              <div>
+                <p className="text-xs font-bold text-text-primary">{item.title}</p>
+                <p className="text-[11px] text-text-tertiary mt-0.5">{item.desc}</p>
               </div>
-            ))}
-          </div>
-          <p className="text-[10px] text-text-tertiary mt-2">
-            The architecture is ready — these can be added when a native Android wrapper is built.
-          </p>
+            </div>
+          ))}
         </div>
       </SettingsSection>
 
