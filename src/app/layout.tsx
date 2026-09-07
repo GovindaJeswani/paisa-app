@@ -8,6 +8,7 @@ import { DesktopSidebar } from "@/components/layout/desktop-sidebar";
 import { FABButton } from "@/components/layout/fab-button";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
+import { NativeBridge } from "@/components/providers/native-bridge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -73,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <BottomNav />
             <InstallPrompt />
             <ServiceWorkerRegister />
+            <NativeBridge />
           </DBProvider>
         </ThemeProvider>
       </body>
