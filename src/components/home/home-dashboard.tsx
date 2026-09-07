@@ -14,6 +14,7 @@ import { useCategoryMap } from "@/lib/hooks/use-categories";
 import { generateInsights, checkProgressiveSuggestions, type SmartInsight, type SmartSuggestion } from "@/lib/engine/intelligence";
 import { TransactionGroup } from "@/components/transactions/transaction-card";
 import { db } from "@/lib/db";
+import { SMSQuickImport } from "@/components/home/sms-quick-import";
 import type { Budget, Goal } from "@/lib/types";
 
 const EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
@@ -103,6 +104,11 @@ export function HomeDashboard() {
         <MiniCard icon="🛡️" label="Safe/day" value={formatCurrency(safeToSpend)} color="text-accent" />
         <MiniCard icon="📅" label="This week" value={formatCurrency(weekExpense, true)} color="text-expense" />
         <MiniCard icon="🔮" label="Projected" value={formatCurrency(projectedExpense, true)} color={projectedExpense > summary.totalIncome ? "text-expense" : "text-text-primary"} />
+      </motion.div>
+
+      {/* Quick SMS import */}
+      <motion.div variants={fadeUp}>
+        <SMSQuickImport />
       </motion.div>
 
       {/* Progressive suggestion — ONE at a time */}

@@ -243,6 +243,55 @@ export default function SettingsPage() {
         </div>
       </SettingsSection>
 
+      {/* Capabilities */}
+      <SettingsSection title="What Works">
+        <div className="space-y-1.5">
+          {[
+            { status: true, label: "Add transactions via natural language" },
+            { status: true, label: "Paste bank SMS to import transactions" },
+            { status: true, label: "Upload CSV bank statements" },
+            { status: true, label: "Scan receipts with OCR (Tesseract.js)" },
+            { status: true, label: "Calendar with financial indicators" },
+            { status: true, label: "Ask Paisa — financial questions" },
+            { status: true, label: "Budgets, Goals, Splits, Lending" },
+            { status: true, label: "Export as CSV, JSON, or printable statement" },
+            { status: true, label: "Install as app (PWA)" },
+            { status: true, label: "Works offline after first load" },
+            { status: true, label: "Dark / Light theme" },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center gap-2 text-xs">
+              <span className="text-income">✓</span>
+              <span className="text-text-secondary">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Requires Native Android App">
+        <div className="rounded-xl border border-warning/20 bg-warning-light p-3">
+          <p className="text-xs text-text-secondary leading-relaxed">
+            These features need a native Android app (not possible in a browser PWA):
+          </p>
+          <div className="space-y-1.5 mt-2">
+            {[
+              "Automatic SMS reading in background",
+              "Gmail auto-import via OAuth",
+              "Push notifications",
+              "Google Drive backup sync",
+              "Background bank statement detection",
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-2 text-xs">
+                <span className="text-warning">○</span>
+                <span className="text-text-tertiary">{item}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-text-tertiary mt-2">
+            The architecture is ready — these can be added when a native Android wrapper is built.
+          </p>
+        </div>
+      </SettingsSection>
+
       {/* About */}
       <SettingsSection title="About">
         <div className="flex items-center gap-3 rounded-xl border border-border-light bg-surface p-3">
@@ -252,7 +301,7 @@ export default function SettingsPage() {
           <div>
             <p className="text-sm font-bold text-text-primary">Paisa</p>
             <p className="text-xs text-text-tertiary">
-              v0.1.0 · Local-first personal finance
+              v2.0.0 · Local-first personal finance
             </p>
           </div>
         </div>
