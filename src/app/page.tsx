@@ -7,7 +7,7 @@ import {
   LayoutGrid, List, Clock, MessageSquare, Check, Loader2, Sun, Moon,
   TrendingUp, TrendingDown, Target, RotateCcw, LogIn, LogOut, Cloud, CloudOff, RefreshCw,
 } from "lucide-react";
-import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCategoryEmoji, getCategoryName, initSettings, type Expense } from "@/lib/db";
+import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCategoryEmoji, getCategoryName, normalizeCategoryForChart, initSettings, type Expense } from "@/lib/db";
 import { cn, formatMoney, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
 import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured } from "@/lib/firebase";
 import type { User } from "firebase/auth";
@@ -112,36 +112,36 @@ function DarkToggle() {
 
 // ── Daily money tips (rotates daily, no API needed) ──
 const MONEY_TIPS = [
-  { emoji: "💡", tip: "The 50/30/20 rule: 50% needs, 30% wants, 20% savings." },
-  { emoji: "🎯", tip: "Pay yourself first — save before you spend." },
-  { emoji: "☕", tip: "₹100/day on chai = ₹36,500/year. Small amounts add up." },
-  { emoji: "📱", tip: "Review your subscriptions monthly. Cancel what you don't use." },
-  { emoji: "🛒", tip: "Make a list before shopping. Impulse buys kill budgets." },
-  { emoji: "💰", tip: "Emergency fund = 3 months of expenses. Start small." },
-  { emoji: "📊", tip: "Track every expense for 30 days. You'll be surprised." },
-  { emoji: "🍔", tip: "Cooking at home saves 60-70% vs ordering food delivery." },
-  { emoji: "🚌", tip: "Public transport vs cabs can save ₹5,000+ per month." },
-  { emoji: "💳", tip: "Credit card? Pay the full bill. Minimum payments are a trap." },
-  { emoji: "🎓", tip: "Invest in skills. The best ROI is investing in yourself." },
-  { emoji: "⏰", tip: "Wait 24 hours before any purchase over ₹1,000." },
-  { emoji: "📈", tip: "Start a SIP with even ₹500/month. Time in market > timing." },
-  { emoji: "🏷️", tip: "Use cashback apps and discount coupons. Free money." },
-  { emoji: "🤝", tip: "Split bills fairly. Use apps to avoid awkward conversations." },
-  { emoji: "📅", tip: "Set bill payment reminders. Late fees are wasted money." },
-  { emoji: "🎁", tip: "Experiences > things. Memories last longer than purchases." },
-  { emoji: "🏠", tip: "Follow the 30% rule: rent should be ≤30% of income." },
-  { emoji: "📝", tip: "Write your financial goals. Written goals are 42% more likely to happen." },
-  { emoji: "🔒", tip: "Don't share UPI PIN or OTP. No bank ever asks for it." },
-  { emoji: "⛽", tip: "Combine errands to save on fuel and auto fares." },
-  { emoji: "🌙", tip: "Sleep on big purchases. Morning clarity saves money." },
-  { emoji: "🎮", tip: "Free entertainment exists: parks, libraries, open-source games." },
-  { emoji: "💪", tip: "Financial fitness is like gym. Consistency beats intensity." },
-  { emoji: "📉", tip: "Market crashes are sales. Don't panic sell your SIPs." },
-  { emoji: "🧮", tip: "Know your hourly rate. Is that purchase worth X hours of work?" },
-  { emoji: "🌱", tip: "Grow your income, not just cut expenses. Both matter." },
-  { emoji: "🎯", tip: "Name your savings goals. 'Goa fund' > 'savings account'." },
-  { emoji: "📱", tip: "Uninstall shopping apps for a week. See what happens." },
-  { emoji: "💸", tip: "Your biggest expense is the one you don't track." },
+  "💡 50/30/20 rule: needs, wants, savings",
+  "☕ ₹100/day chai = ₹36,500/year",
+  "📱 Check your subscriptions. Cancel unused ones",
+  "🛒 Make a list before shopping",
+  "💰 Save first, spend what's left",
+  "🍔 Cooking > ordering. Save 60%",
+  "🚌 Metro > cab. Save ₹5K/month",
+  "💳 Pay credit card in full. Always",
+  "⏰ Wait 24hrs before ₹1000+ purchases",
+  "📈 Start SIP with even ₹500/month",
+  "🎯 Name your goals. 'Goa fund' works better than 'savings'",
+  "📝 Writing goals makes them 42% more likely",
+  "🧮 Is that worth X hours of your work?",
+  "📱 Uninstall shopping apps for a week",
+  "💸 Your biggest expense is the one you don't track",
+  "🌙 Sleep on big purchases. Morning brain is smarter",
+  "🎮 Free fun exists: parks, YouTube, open-source games",
+  "💪 Money fitness = consistency, not intensity",
+  "🏠 Rent should be ≤30% of your income",
+  "⛽ Combine errands. Save fuel money",
+  "🎁 Experiences > things. Memories last longer",
+  "📉 Market crashed? Don't panic. Keep your SIP",
+  "🔒 Never share UPI PIN or OTP. Ever",
+  "🌱 Grow income AND cut expenses. Both matter",
+  "🤝 Split bills fairly. No one likes awkward conversations",
+  "📅 Bill reminders save late fees",
+  "🎓 Best investment = investing in your skills",
+  "💸 ₹10 saved daily = ₹3,650/year = vacation fund",
+  "🛍️ 'Sale' doesn't mean 'save'. It means 'spend'",
+  "🧊 The best budget is the one you actually follow",
 ];
 
 function DailyTip() {
@@ -149,12 +149,35 @@ function DailyTip() {
   const tip = MONEY_TIPS[dayOfYear % MONEY_TIPS.length];
 
   return (
-    <div className="mt-3 rounded-xl bg-orange-bg/50 border border-orange/10 p-3 flex items-start gap-2.5">
-      <span className="text-lg mt-0.5">{tip.emoji}</span>
-      <div>
-        <p className="text-[10px] font-bold text-orange uppercase tracking-wider">Daily money tip</p>
-        <p className="text-[12px] text-text2 mt-0.5 leading-relaxed">{tip.tip}</p>
-      </div>
+    <div className="mt-3 rounded-xl bg-orange-bg/50 border border-orange/10 p-2.5 flex items-center gap-2.5">
+      <span className="text-base">{tip.slice(0, 2)}</span>
+      <p className="text-[11px] text-text2 leading-relaxed flex-1">{tip.slice(2).trim()}</p>
+    </div>
+  );
+}
+
+function CollapsibleDay({ date, items, daySpent, dayIncome, defaultOpen }: {
+  date: string; items: Expense[]; daySpent: number; dayIncome: number; defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="anim-up">
+      <button onClick={() => setOpen(!open)} className="flex items-center justify-between w-full mb-1.5 px-1">
+        <div className="flex items-center gap-1.5">
+          <ChevronRight size={12} className={cn("text-text3 transition-transform", open && "rotate-90")} />
+          <span className="text-[11px] font-bold text-text3 uppercase tracking-wider">{friendlyDate(date)}</span>
+          {!open && <span className="text-[10px] text-text3">({items.length})</span>}
+        </div>
+        <div className="flex gap-2">
+          {dayIncome > 0 && <span className="text-[11px] font-bold text-green tabular-nums">+{formatMoney(dayIncome)}</span>}
+          {daySpent > 0 && <span className="text-[11px] font-bold text-red tabular-nums">−{formatMoney(daySpent)}</span>}
+        </div>
+      </button>
+      {open && (
+        <div className="space-y-1 anim-fade">
+          {items.map((e) => <ExpenseRow key={e.id} expense={e} />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -194,9 +217,14 @@ function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: Us
 
   // Category breakdown (expenses only)
   const catBreakdown = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const e of monthExpenses) map.set(e.category, (map.get(e.category) || 0) + e.amount);
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    const map = new Map<string, { amount: number; emoji: string }>();
+    for (const e of monthExpenses) {
+      const name = normalizeCategoryForChart(e.category);
+      const existing = map.get(name) || { amount: 0, emoji: getCategoryEmoji(e.category) };
+      existing.amount += e.amount;
+      map.set(name, existing);
+    }
+    return Array.from(map.entries()).map(([name, { amount, emoji }]) => ({ name, amount, emoji })).sort((a, b) => b.amount - a.amount);
   }, [monthExpenses]);
 
   // 7-day chart
@@ -320,17 +348,16 @@ function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: Us
         <div className="mt-4">
           <h3 className="text-xs font-bold text-text3 uppercase tracking-wider mb-2">Spending split</h3>
           <div className="flex gap-4 items-center">
-            {/* SVG donut chart */}
-            <PieChart data={catBreakdown} total={monthSpent} />
+            <PieChart data={catBreakdown.map((c) => [c.name, c.amount])} total={monthSpent} />
             <div className="flex-1 space-y-1.5">
-              {catBreakdown.slice(0, 5).map(([cat, amount]) => {
-                const pct = monthSpent > 0 ? Math.round((amount / monthSpent) * 100) : 0;
+              {catBreakdown.slice(0, 5).map((c) => {
+                const pct = monthSpent > 0 ? Math.round((c.amount / monthSpent) * 100) : 0;
                 return (
-                  <div key={cat} className="flex items-center gap-2">
-                    <span className="text-sm">{getCategoryEmoji(cat)}</span>
+                  <div key={c.name} className="flex items-center gap-2">
+                    <span className="text-sm">{c.emoji}</span>
                     <div className="flex-1">
                       <div className="flex justify-between text-[11px]">
-                        <span className="font-semibold text-text">{getCategoryName(cat)}</span>
+                        <span className="font-semibold text-text">{c.name}</span>
                         <span className="font-bold text-text tabular-nums">{pct}%</span>
                       </div>
                       <div className="h-1 rounded-full bg-surface2 mt-0.5 overflow-hidden">
@@ -353,24 +380,12 @@ function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: Us
           <p className="text-sm text-text2 mt-1">Tap <span className="text-accent font-bold">+</span> to add your first one</p>
         </div>
       ) : (
-        <div className="mt-4 space-y-4">
-          {grouped.map(([date, items]) => {
+        <div className="mt-4 space-y-3">
+          {grouped.map(([date, items], idx) => {
             const daySpent = items.filter((e) => e.type === "expense").reduce((s, e) => s + e.amount, 0);
             const dayIncome = items.filter((e) => e.type === "income").reduce((s, e) => s + e.amount, 0);
-            return (
-              <div key={date} className="anim-up">
-                <div className="flex items-center justify-between mb-1.5 px-1">
-                  <span className="text-[11px] font-bold text-text3 uppercase tracking-wider">{friendlyDate(date)}</span>
-                  <div className="flex gap-2">
-                    {dayIncome > 0 && <span className="text-[11px] font-bold text-green tabular-nums">+{formatMoney(dayIncome)}</span>}
-                    {daySpent > 0 && <span className="text-[11px] font-bold text-red tabular-nums">−{formatMoney(daySpent)}</span>}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  {items.map((e) => <ExpenseRow key={e.id} expense={e} />)}
-                </div>
-              </div>
-            );
+            const isToday = date === todayStr;
+            return <CollapsibleDay key={date} date={date} items={items} daySpent={daySpent} dayIncome={dayIncome} defaultOpen={isToday || idx === 0} />;
           })}
         </div>
       )}
