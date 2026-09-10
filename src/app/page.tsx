@@ -6,10 +6,12 @@ import {
   Plus, Calendar, ChevronLeft, ChevronRight, X, Trash2, ArrowDown, ArrowUp,
   LayoutGrid, List, Clock, MessageSquare, Check, Loader2, Sun, Moon,
   TrendingUp, TrendingDown, Target, RotateCcw, LogIn, LogOut, Cloud, CloudOff, RefreshCw,
+  Search, Settings, CreditCard, Repeat, Download, Camera, ChevronDown, Users,
 } from "lucide-react";
-import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCategoryEmoji, getCategoryName, normalizeCategoryForChart, initSettings, type Expense } from "@/lib/db";
+import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCategoryEmoji, getCategoryName, normalizeCategoryForChart, initSettings, getSettings, PAYMENT_MODES, FUN_FACTS, type Expense, type FriendSplit } from "@/lib/db";
 import { cn, formatMoney, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
 import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured } from "@/lib/firebase";
+import { FriendSplitSection } from "@/components/splits";
 import type { User } from "firebase/auth";
 
 // ── init DB settings on load ──
@@ -19,6 +21,9 @@ export default function Home() {
   const [showAdd, setShowAdd] = useState(false);
   const [showSMS, setShowSMS] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
   const [tab, setTab] = useState<"home" | "calendar">("home");
   const [user, setUser] = useState<User | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -52,7 +57,7 @@ export default function Home() {
 
   return (
     <>
-      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} user={user} syncing={syncing} onSync={handleSync} /> : <CalendarTab />}
+      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} onSearch={() => setShowSearch(true)} onSettings={() => setShowSettings(true)} user={user} syncing={syncing} onSync={handleSync} /> : <CalendarTab />}
 
       {/* Bottom nav */}
       <nav className="sticky bottom-0 border-t border-border bg-surface/80 backdrop-blur-xl flex safe-b">
@@ -78,6 +83,8 @@ export default function Home() {
       {showAdd && <AddExpenseSheet onClose={() => setShowAdd(false)} />}
       {showSMS && <SMSImportSheet onClose={() => setShowSMS(false)} />}
       {showQuick && <QuickNumpad onClose={() => setShowQuick(false)} />}
+      {showSearch && <SearchSheet onClose={() => setShowSearch(false)} />}
+      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
     </>
   );
 }
@@ -145,8 +152,10 @@ const MONEY_TIPS = [
 ];
 
 function DailyTip() {
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  const tip = MONEY_TIPS[dayOfYear % MONEY_TIPS.length];
+  // Rotate every 4 hours (6 tips per day)
+  const hourSlot = Math.floor(Date.now() / (4 * 60 * 60 * 1000));
+  const allTips = [...MONEY_TIPS, ...FUN_FACTS.map((f) => f)];
+  const tip = allTips[hourSlot % allTips.length];
 
   return (
     <div className="mt-3 rounded-xl bg-orange-bg/50 border border-orange/10 p-2.5 flex items-center gap-2.5">
@@ -182,7 +191,7 @@ function CollapsibleDay({ date, items, daySpent, dayIncome, defaultOpen }: {
   );
 }
 
-function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
+function HomeTab({ onSMS, onSearch, onSettings, user, syncing, onSync }: { onSMS: () => void; onSearch: () => void; onSettings: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
   const now = new Date();
   const ms = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const me = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-31`;
@@ -196,6 +205,18 @@ function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: Us
   const monthEarned = monthIncome.reduce((s, e) => s + e.amount, 0);
   const todaySpent = monthExpenses.filter((e) => e.date === todayStr).reduce((s, e) => s + e.amount, 0);
   const balance = monthEarned - monthSpent;
+
+  // Budget
+  const settings = useLiveQuery(() => db.settings.get("default"));
+  const budget = settings?.monthlyBudget || 0;
+  const budgetPct = budget > 0 ? Math.min(100, Math.round((monthSpent / budget) * 100)) : 0;
+
+  // Last month comparison
+  const lastMs = `${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}-${String(now.getMonth() === 0 ? 12 : now.getMonth()).padStart(2, "0")}-01`;
+  const lastMe = `${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}-${String(now.getMonth() === 0 ? 12 : now.getMonth()).padStart(2, "0")}-31`;
+  const lastMonthExps = useLiveQuery(() => db.expenses.where("date").between(lastMs, lastMe, true, true).toArray(), [lastMs]) ?? [];
+  const lastMonthSpent = lastMonthExps.filter((e) => e.type === "expense").reduce((s, e) => s + e.amount, 0);
+  const vsLastMonth = lastMonthSpent > 0 ? Math.round(((monthSpent - lastMonthSpent) / lastMonthSpent) * 100) : 0;
 
   // Tracking streak
   const streak = useMemo(() => {
@@ -248,6 +269,9 @@ function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: Us
 
   return (
     <div className="flex-1 px-4 pt-5 pb-4 overflow-y-auto">
+      {/* Reminder banner */}
+      <ReminderBanner todayHasExpenses={todaySpent > 0} />
+
       <div className="flex items-center justify-between mb-1">
         <p className="text-sm text-text2">{getGreeting()} 👋</p>
         <div className="flex items-center gap-1">
@@ -258,6 +282,14 @@ function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: Us
               {syncing ? <Loader2 size={16} className="text-accent animate-spin" /> : <Cloud size={16} className="text-green" />}
             </button>
           )}
+          {/* Search */}
+          <button onClick={onSearch} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-surface2 transition-colors">
+            <Search size={16} className="text-text3" />
+          </button>
+          {/* Settings */}
+          <button onClick={onSettings} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-surface2 transition-colors">
+            <Settings size={16} className="text-text3" />
+          </button>
           {/* Google login/logout */}
           {isFirebaseConfigured() && (
             user ? (
@@ -308,10 +340,39 @@ function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: Us
           <p className="text-sm font-extrabold text-text tabular-nums mt-0.5">{daysLeft}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-2.5 text-center">
-          <p className="text-[9px] font-bold text-text3 uppercase">Transactions</p>
-          <p className="text-sm font-extrabold text-text tabular-nums mt-0.5">{expenses.length}</p>
+          <p className="text-[9px] font-bold text-text3 uppercase">
+            {lastMonthSpent > 0 ? "vs Last" : "Transactions"}
+          </p>
+          <p className={cn("text-sm font-extrabold tabular-nums mt-0.5",
+            lastMonthSpent > 0 ? (vsLastMonth <= 0 ? "text-green" : "text-red") : "text-text")}>
+            {lastMonthSpent > 0 ? `${vsLastMonth > 0 ? "+" : ""}${vsLastMonth}%` : expenses.length}
+          </p>
         </div>
       </div>
+
+      {/* Budget progress bar */}
+      {budget > 0 && (
+        <div className="mt-3 rounded-xl border border-border bg-surface p-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-bold text-text3 uppercase">Monthly Budget</span>
+            <span className={cn("text-[11px] font-bold tabular-nums", budgetPct >= 90 ? "text-red" : budgetPct >= 70 ? "text-orange" : "text-green")}>
+              {formatMoney(monthSpent)} / {formatMoney(budget)}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-surface2 overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all",
+              budgetPct >= 90 ? "bg-red" : budgetPct >= 70 ? "bg-orange" : "bg-green")}
+              style={{ width: `${budgetPct}%` }} />
+          </div>
+          <p className="text-[10px] text-text3 mt-1">
+            {budgetPct >= 100 ? `Over budget by ${formatMoney(monthSpent - budget)}` :
+             `${formatMoney(budget - monthSpent)} remaining · ${budgetPct}% used`}
+          </p>
+        </div>
+      )}
+
+      {/* Friend splits — who owes who */}
+      <FriendSplitSection />
 
       {/* SMS import */}
       <button onClick={onSMS}
@@ -447,16 +508,29 @@ function ExpenseRow({ expense }: { expense: Expense }) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [editAmt, setEditAmt] = useState(String(expense.amount));
   const [editDesc, setEditDesc] = useState(expense.description);
   const [editCat, setEditCat] = useState(expense.category);
   const isIncome = expense.type === "income";
 
   const handleDelete = async () => {
-    await db.expenses.delete(expense.id);
-    // Also delete from cloud if logged in
-    const u = getCurrentUser();
-    if (u) deleteExpenseFromCloud(u.uid, expense.id).catch(() => {});
+    setDeleted(true);
+    // 4 second undo window
+    const timer = setTimeout(async () => {
+      await db.expenses.delete(expense.id);
+      const u = getCurrentUser();
+      if (u) deleteExpenseFromCloud(u.uid, expense.id).catch(() => {});
+    }, 4000);
+    // Store timer so undo can cancel it
+    (window as unknown as Record<string, unknown>)[`undo_${expense.id}`] = timer;
+  };
+
+  const handleUndo = () => {
+    const timer = (window as unknown as Record<string, unknown>)[`undo_${expense.id}`] as ReturnType<typeof setTimeout>;
+    if (timer) clearTimeout(timer);
+    setDeleted(false);
+    setConfirmDelete(false);
   };
 
   const handleEdit = async () => {
@@ -468,6 +542,16 @@ function ExpenseRow({ expense }: { expense: Expense }) {
     if (u) syncExpenseToCloud(u.uid, updated).catch(() => {});
     setEditing(false);
   };
+
+  if (deleted) {
+    return (
+      <div className="rounded-xl border border-border bg-surface2 p-3 flex items-center gap-3 anim-fade">
+        <Trash2 size={14} className="text-text3" />
+        <p className="text-[12px] text-text3 flex-1">Deleted</p>
+        <button onClick={handleUndo} className="text-[11px] font-bold text-accent">Undo</button>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("rounded-xl border transition-colors",
@@ -483,6 +567,7 @@ function ExpenseRow({ expense }: { expense: Expense }) {
           <p className="text-[13px] font-semibold text-text truncate">{expense.description}</p>
           <p className="text-[11px] text-text3">
             {getCategoryName(expense.category)} · {expense.time}
+            {expense.paymentMode ? ` · ${PAYMENT_MODES.find((m) => m.value === expense.paymentMode)?.emoji || ""}` : ""}
             {expense.location ? ` · 📍${expense.location}` : ""}
           </p>
         </div>
@@ -808,6 +893,8 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(toDateStr(new Date()));
   const [isIncome, setIsIncome] = useState(false);
   const [location, setLocation] = useState("");
+  const [paymentMode, setPaymentMode] = useState<string>("upi");
+  const [photo, setPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -830,7 +917,8 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       amount: amt, description: finalDesc, category: category || detectedCategory,
       type: isIncome ? "income" : "expense", date,
-      location: location || undefined,
+      location: location || undefined, paymentMode: paymentMode as Expense["paymentMode"],
+      photoUrl: photo || undefined,
       time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
       createdAt: now.toISOString(),
     };
@@ -873,11 +961,37 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
 
               <div>
                 <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-1 block">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-text3 font-bold">₹</span>
-                  <input ref={amountRef} type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0"
-                    className="w-full rounded-xl border border-border bg-surface2 pl-10 pr-4 py-4 text-2xl font-extrabold text-text tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-text3 font-bold">₹</span>
+                    <input ref={amountRef} type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0"
+                      className="w-full rounded-xl border border-border bg-surface2 pl-10 pr-4 py-4 text-2xl font-extrabold text-text tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+                  </div>
+                  {/* Camera button for receipt */}
+                  <button type="button" onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file"; input.accept = "image/*"; input.capture = "environment";
+                    input.onchange = (ev) => {
+                      const file = (ev.target as HTMLInputElement).files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (e) => setPhoto(e.target?.result as string);
+                      reader.readAsDataURL(file);
+                    };
+                    input.click();
+                  }}
+                    className={cn("flex h-auto w-14 items-center justify-center rounded-xl border transition-colors",
+                      photo ? "border-green bg-green-bg" : "border-border bg-surface2 hover:bg-surface")}>
+                    {photo ? <Check size={18} className="text-green" /> : <Camera size={18} className="text-text3" />}
+                  </button>
                 </div>
+                {photo && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <img src={photo} className="h-8 w-8 rounded-lg object-cover" alt="Receipt" />
+                    <span className="text-[10px] text-green font-semibold">Receipt attached</span>
+                    <button onClick={() => setPhoto(null)} className="text-[10px] text-text3 ml-auto">Remove</button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -940,6 +1054,21 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
                 <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g. Koramangala, MG Road, College"
                   className="w-full rounded-xl border border-border bg-surface2 px-4 py-2.5 text-sm text-text outline-none focus:border-accent" />
+              </div>
+
+              {/* Payment mode */}
+              <div>
+                <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-1.5 block">Payment Mode</label>
+                <div className="flex gap-1.5">
+                  {PAYMENT_MODES.map((m) => (
+                    <button key={m.value} onClick={() => setPaymentMode(m.value)}
+                      className={cn("flex-1 flex flex-col items-center gap-0.5 rounded-xl border py-2 transition-all",
+                        paymentMode === m.value ? "border-accent bg-accent-bg text-accent" : "border-border text-text3")}>
+                      <span className="text-sm">{m.emoji}</span>
+                      <span className="text-[9px] font-semibold">{m.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <button onClick={handleSave} disabled={saving || !amount || parseFloat(amount) <= 0}
@@ -1021,6 +1150,263 @@ function SMSImportSheet({ onClose }: { onClose: () => void }) {
             className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-bold text-white disabled:opacity-40">
             {loading ? <><Loader2 size={16} className="animate-spin" /> Parsing...</> : <><MessageSquare size={16} /> Parse & Import</>}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ════════════════════════════════════════════════════════
+// REMINDER BANNER — shows when you open the app
+// ════════════════════════════════════════════════════════
+
+function ReminderBanner({ todayHasExpenses }: { todayHasExpenses: boolean }) {
+  const [dismissed, setDismissed] = useState(false);
+  const hour = new Date().getHours();
+
+  // Don't show if already dismissed this session or already has expenses
+  if (dismissed) return null;
+
+  // Night reminder (9pm - 1am)
+  if (hour >= 21 || hour < 1) {
+    if (todayHasExpenses) return null; // Already logged
+    return (
+      <div className="mb-3 rounded-xl bg-accent-bg border border-accent/20 p-3 flex items-center gap-2.5 anim-fade">
+        <span className="text-lg">🌙</span>
+        <div className="flex-1">
+          <p className="text-[12px] font-bold text-text">End of day check</p>
+          <p className="text-[10px] text-text2">Did you log all today's expenses? Don't forget!</p>
+        </div>
+        <button onClick={() => setDismissed(true)} className="text-text3 hover:text-text2"><X size={14} /></button>
+      </div>
+    );
+  }
+
+  // Afternoon nudge (2pm - 4pm) if nothing logged today
+  if (hour >= 14 && hour <= 16 && !todayHasExpenses) {
+    return (
+      <div className="mb-3 rounded-xl bg-orange-bg/50 border border-orange/10 p-2.5 flex items-center gap-2.5 anim-fade">
+        <span className="text-base">📝</span>
+        <p className="text-[11px] text-text2 flex-1">Any expenses today? Quick add with the + button</p>
+        <button onClick={() => setDismissed(true)} className="text-text3 hover:text-text2"><X size={14} /></button>
+      </div>
+    );
+  }
+
+  // Zero-spend celebration
+  if (hour >= 20 && todayHasExpenses === false) {
+    return (
+      <div className="mb-3 rounded-xl bg-green-bg border border-green/10 p-2.5 flex items-center gap-2.5 anim-fade">
+        <span className="text-base">✨</span>
+        <p className="text-[11px] text-text2 flex-1">Zero spend day so far! Keep it up 💪</p>
+        <button onClick={() => setDismissed(true)} className="text-text3 hover:text-text2"><X size={14} /></button>
+      </div>
+    );
+  }
+
+  return null;
+}
+// ════════════════════════════════════════════════════════
+// SEARCH SHEET
+// ════════════════════════════════════════════════════════
+
+function SearchSheet({ onClose }: { onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const allExpenses = useLiveQuery(() => db.expenses.orderBy("date").reverse().toArray()) ?? [];
+
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return allExpenses.filter((e) =>
+      e.description.toLowerCase().includes(q) ||
+      e.category.toLowerCase().includes(q) ||
+      e.location?.toLowerCase().includes(q) ||
+      String(e.amount).includes(q) ||
+      e.date.includes(q)
+    ).slice(0, 30);
+  }, [query, allExpenses]);
+
+  const totalResults = results.reduce((s, e) => s + (e.type === "expense" ? e.amount : 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-surface shadow-xl anim-up max-h-[85vh] overflow-y-auto">
+        <div className="flex justify-center py-2"><div className="h-1 w-10 rounded-full bg-border" /></div>
+        <div className="px-5 pb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text3" />
+              <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search expenses... (Swiggy, ₹500, Food, etc.)" autoFocus
+                className="w-full rounded-xl border border-border bg-surface2 pl-9 pr-4 py-3 text-sm text-text outline-none focus:border-accent" />
+            </div>
+            <button onClick={onClose} className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-surface2 shrink-0">
+              <X size={18} className="text-text2" />
+            </button>
+          </div>
+
+          {query.trim() && results.length > 0 && (
+            <p className="text-[11px] text-text3 mb-2">{results.length} results · {formatMoney(totalResults)} total expenses</p>
+          )}
+
+          {query.trim() && results.length === 0 && (
+            <p className="text-sm text-text3 text-center py-8">No results for "{query}"</p>
+          )}
+
+          <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+            {results.map((e) => (
+              <div key={e.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-2.5">
+                <span className="text-base">{getCategoryEmoji(e.category)}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-semibold text-text truncate">{e.description}</p>
+                  <p className="text-[10px] text-text3">{e.date} · {getCategoryName(e.category)}</p>
+                </div>
+                <span className={cn("text-[12px] font-bold tabular-nums", e.type === "income" ? "text-green" : "text-text")}>
+                  {e.type === "income" ? "+" : ""}{formatMoney(e.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {!query.trim() && (
+            <div className="text-center py-8">
+              <Search size={24} className="text-text3 mx-auto mb-2" />
+              <p className="text-sm text-text3">Search by name, category, amount, or date</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════
+// SETTINGS SHEET — Budget, reminders, export, payment mode
+// ════════════════════════════════════════════════════════
+
+function SettingsSheet({ onClose }: { onClose: () => void }) {
+  const settings = useLiveQuery(() => db.settings.get("default"));
+  const [budget, setBudget] = useState("");
+  const [exported, setExported] = useState(false);
+
+  useEffect(() => {
+    if (settings?.monthlyBudget) setBudget(String(settings.monthlyBudget));
+  }, [settings]);
+
+  const handleSaveBudget = async () => {
+    const amt = parseFloat(budget) || 0;
+    await db.settings.update("default", { monthlyBudget: amt });
+  };
+
+  const handleExportCSV = async () => {
+    const expenses = await db.expenses.orderBy("date").reverse().toArray();
+    const headers = "Date,Time,Description,Category,Amount,Type,Payment Mode,Location\n";
+    const rows = expenses.map((e) =>
+      `${e.date},${e.time},"${e.description}","${getCategoryName(e.category)}",${e.amount},${e.type},${e.paymentMode || "upi"},${e.location || ""}`
+    ).join("\n");
+    const csv = headers + rows;
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `paisa-expenses-${toDateStr(new Date())}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+  };
+
+  const handleExportJSON = async () => {
+    const data = { expenses: await db.expenses.toArray(), settings: await db.settings.toArray(), exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `paisa-backup-${toDateStr(new Date())}.json`; a.click();
+    URL.revokeObjectURL(url);
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-surface shadow-xl anim-up max-h-[85vh] overflow-y-auto">
+        <div className="flex justify-center py-2"><div className="h-1 w-10 rounded-full bg-border" /></div>
+        <div className="px-5 pb-8 space-y-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-text">Settings</h2>
+            <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-surface2"><X size={18} className="text-text2" /></button>
+          </div>
+
+          {/* Monthly budget */}
+          <div>
+            <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-1 block">Monthly Budget Limit</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text3 font-bold">₹</span>
+                <input type="number" value={budget} onChange={(e) => setBudget(e.target.value)}
+                  placeholder="e.g. 15000"
+                  className="w-full rounded-xl border border-border bg-surface2 pl-7 pr-3 py-2.5 text-sm font-bold text-text outline-none focus:border-accent tabular-nums" />
+              </div>
+              <button onClick={handleSaveBudget} className="rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white">Save</button>
+            </div>
+            <p className="text-[10px] text-text3 mt-1">Set to 0 to hide the budget bar</p>
+          </div>
+
+          {/* Export */}
+          <div>
+            <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-2 block">Export Data</label>
+            <div className="flex gap-2">
+              <button onClick={handleExportCSV}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-xs font-semibold text-text2 hover:bg-surface2">
+                <Download size={14} /> CSV (Excel)
+              </button>
+              <button onClick={handleExportJSON}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-xs font-semibold text-text2 hover:bg-surface2">
+                <Download size={14} /> JSON Backup
+              </button>
+            </div>
+            {exported && <p className="text-[11px] text-green font-semibold mt-1 anim-fade">✓ Downloaded!</p>}
+          </div>
+
+          {/* Privacy */}
+          <div className="rounded-xl bg-surface2 p-3">
+            <p className="text-[11px] font-bold text-text2 mb-1">🔒 Your data is safe</p>
+            <p className="text-[10px] text-text3 leading-relaxed">
+              All data stored locally on your device. Cloud sync only when signed in with Google. No ads, no tracking, no selling data.
+            </p>
+          </div>
+
+          {/* Google account */}
+          {isFirebaseConfigured() && (
+            <div>
+              <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-2 block">Account</label>
+              {getCurrentUser() ? (
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
+                  {getCurrentUser()?.photoURL ? (
+                    <img src={getCurrentUser()!.photoURL!} className="h-9 w-9 rounded-full" alt="" />
+                  ) : (
+                    <div className="h-9 w-9 rounded-full bg-accent text-white flex items-center justify-center font-bold">{getCurrentUser()?.displayName?.[0]}</div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-text">{getCurrentUser()?.displayName}</p>
+                    <p className="text-[10px] text-text3">{getCurrentUser()?.email}</p>
+                  </div>
+                  <button onClick={() => { signOutUser(); onClose(); }}
+                    className="text-xs font-semibold text-red hover:bg-red-bg px-2.5 py-1.5 rounded-lg">
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <button onClick={async () => { await signInWithGoogle(); }}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-semibold text-text hover:bg-surface2">
+                  <LogIn size={16} /> Sign in with Google
+                </button>
+              )}
+            </div>
+          )}
+
+          <p className="text-[10px] text-text3 text-center">Paisa v4.0 · Made with ❤️</p>
         </div>
       </div>
     </div>

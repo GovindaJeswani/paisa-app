@@ -64,13 +64,10 @@ export async function syncToCloud(userId: string): Promise<number> {
   for (const exp of localExpenses) {
     const docRef = doc(firestore, "users", userId, "expenses", exp.id);
     batch.set(docRef, {
-      amount: exp.amount,
-      description: exp.description,
-      category: exp.category,
-      type: exp.type || "expense",
-      date: exp.date,
-      time: exp.time,
-      location: exp.location || null,
+      amount: exp.amount, description: exp.description, category: exp.category,
+      type: exp.type || "expense", date: exp.date, time: exp.time,
+      location: exp.location || null, paymentMode: exp.paymentMode || "upi",
+      isRecurring: exp.isRecurring || false, tags: exp.tags || [],
       createdAt: exp.createdAt,
     });
     count++;
@@ -89,15 +86,11 @@ export async function syncFromCloud(userId: string): Promise<number> {
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
     const expense: Expense = {
-      id: docSnap.id,
-      amount: data.amount,
-      description: data.description,
-      category: data.category,
-      type: data.type || "expense",
-      date: data.date,
-      time: data.time,
-      location: data.location || undefined,
-      createdAt: data.createdAt,
+      id: docSnap.id, amount: data.amount, description: data.description,
+      category: data.category, type: data.type || "expense", date: data.date,
+      time: data.time, location: data.location || undefined,
+      paymentMode: data.paymentMode || "upi", isRecurring: data.isRecurring || false,
+      tags: data.tags || [], createdAt: data.createdAt,
     };
     await localDb.expenses.put(expense); // put = upsert
     count++;
@@ -110,13 +103,10 @@ export async function syncExpenseToCloud(userId: string, expense: Expense): Prom
   if (!firestore) return;
   const docRef = doc(firestore, "users", userId, "expenses", expense.id);
   await setDoc(docRef, {
-    amount: expense.amount,
-    description: expense.description,
-    category: expense.category,
-    type: expense.type || "expense",
-    date: expense.date,
-    time: expense.time,
-    location: expense.location || null,
+    amount: expense.amount, description: expense.description, category: expense.category,
+    type: expense.type || "expense", date: expense.date, time: expense.time,
+    location: expense.location || null, paymentMode: expense.paymentMode || "upi",
+    isRecurring: expense.isRecurring || false, tags: expense.tags || [],
     createdAt: expense.createdAt,
   });
 }
@@ -136,15 +126,11 @@ export function listenToCloudChanges(userId: string, onUpdate: () => void): () =
       if (change.type === "added" || change.type === "modified") {
         const data = change.doc.data();
         await localDb.expenses.put({
-          id: change.doc.id,
-          amount: data.amount,
-          description: data.description,
-          category: data.category,
-          type: data.type || "expense",
-          date: data.date,
-          time: data.time,
-          location: data.location || undefined,
-          createdAt: data.createdAt,
+          id: change.doc.id, amount: data.amount, description: data.description,
+          category: data.category, type: data.type || "expense", date: data.date,
+          time: data.time, location: data.location || undefined,
+          paymentMode: data.paymentMode || "upi", isRecurring: data.isRecurring || false,
+          tags: data.tags || [], createdAt: data.createdAt,
         });
       } else if (change.type === "removed") {
         await localDb.expenses.delete(change.doc.id);
