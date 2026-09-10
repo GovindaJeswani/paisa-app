@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   Plus, Calendar, ChevronLeft, ChevronRight, X, Trash2, ArrowDown,
-  LayoutGrid, List, Clock, MessageSquare, Check, Loader2,
+  LayoutGrid, List, Clock, MessageSquare, Check, Loader2, Sun, Moon,
 } from "lucide-react";
 import { db, guessCategory, CATEGORIES, getCategoryEmoji, getCategoryName, type Expense } from "@/lib/db";
 import { cn, formatMoney, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
@@ -50,6 +50,27 @@ export default function Home() {
 // HOME TAB — with spending chart + SMS import button
 // ════════════════════════════════════════════════════════
 
+function DarkToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const saved = localStorage.getItem("paisa-dark");
+    const isDark = saved ? saved === "true" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
+  }, []);
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("paisa-dark", String(next));
+  };
+  return (
+    <button onClick={toggle} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-surface2 transition-colors" aria-label="Toggle dark mode">
+      {dark ? <Sun size={18} className="text-orange" /> : <Moon size={18} className="text-text3" />}
+    </button>
+  );
+}
+
 function HomeTab({ onOpenSMS }: { onOpenSMS: () => void }) {
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
@@ -92,7 +113,10 @@ function HomeTab({ onOpenSMS }: { onOpenSMS: () => void }) {
 
   return (
     <div className="flex-1 px-4 pt-5 pb-4 overflow-y-auto">
-      <p className="text-sm text-text2">{getGreeting()} 👋</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-text2">{getGreeting()} 👋</p>
+        <DarkToggle />
+      </div>
 
       {/* Hero */}
       <div className="mt-3 rounded-2xl bg-accent p-5 text-white relative overflow-hidden">
