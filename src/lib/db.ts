@@ -8,6 +8,7 @@ export interface Expense {
   type: "expense" | "income";
   date: string;
   time: string;
+  location?: string;    // optional location
   createdAt: string;
 }
 

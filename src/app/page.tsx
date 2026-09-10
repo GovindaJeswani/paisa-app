@@ -444,33 +444,107 @@ function PieChart({ data, total }: { data: [string, number][]; total: number }) 
 // ════════════════════════════════════════════════════════
 
 function ExpenseRow({ expense }: { expense: Expense }) {
-  const [showDelete, setShowDelete] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editAmt, setEditAmt] = useState(String(expense.amount));
+  const [editDesc, setEditDesc] = useState(expense.description);
+  const [editCat, setEditCat] = useState(expense.category);
   const isIncome = expense.type === "income";
 
+  const handleDelete = async () => {
+    await db.expenses.delete(expense.id);
+    // Also delete from cloud if logged in
+    const u = getCurrentUser();
+    if (u) deleteExpenseFromCloud(u.uid, expense.id).catch(() => {});
+  };
+
+  const handleEdit = async () => {
+    const amt = parseFloat(editAmt);
+    if (!amt || amt <= 0) return;
+    const updated = { ...expense, amount: amt, description: editDesc || getCategoryName(editCat), category: editCat };
+    await db.expenses.put(updated);
+    const u = getCurrentUser();
+    if (u) syncExpenseToCloud(u.uid, updated).catch(() => {});
+    setEditing(false);
+  };
+
   return (
-    <div className={cn("flex items-center gap-3 rounded-xl border p-3 active:bg-surface2 transition-colors",
-      isIncome ? "border-green/20 bg-green-bg" : "border-border bg-surface")}
-      onClick={() => setShowDelete(!showDelete)}>
-      <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl text-lg",
-        isIncome ? "bg-green/10" : "bg-accent-bg")}>
-        {isIncome ? "💰" : getCategoryEmoji(expense.category)}
+    <div className={cn("rounded-xl border transition-colors",
+      isIncome ? "border-green/20 bg-green-bg" : "border-border bg-surface")}>
+
+      {/* Main row — tap to expand */}
+      <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => { setExpanded(!expanded); setConfirmDelete(false); setEditing(false); }}>
+        <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl text-lg shrink-0",
+          isIncome ? "bg-green/10" : "bg-accent-bg")}>
+          {isIncome ? "💰" : getCategoryEmoji(expense.category)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-text truncate">{expense.description}</p>
+          <p className="text-[11px] text-text3">
+            {getCategoryName(expense.category)} · {expense.time}
+            {expense.location ? ` · 📍${expense.location}` : ""}
+          </p>
+        </div>
+        <span className={cn("text-[13px] font-bold tabular-nums shrink-0", isIncome ? "text-green" : "text-text")}>
+          {isIncome ? "+" : ""}{formatMoney(expense.amount)}
+        </span>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold text-text truncate">{expense.description}</p>
-        <p className="text-[11px] text-text3">{getCategoryName(expense.category)} · {expense.time}</p>
-      </div>
-      <div className="text-right shrink-0">
-        {showDelete ? (
-          <button onClick={(e) => { e.stopPropagation(); db.expenses.delete(expense.id); }}
-            className="flex items-center gap-1 text-red text-xs font-bold bg-red-bg px-2.5 py-1.5 rounded-lg">
-            <Trash2 size={12} /> Delete
+
+      {/* Expanded actions */}
+      {expanded && !editing && (
+        <div className="px-3 pb-3 flex gap-2 anim-fade">
+          <button onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-xs font-semibold text-text2 hover:bg-surface2 transition-colors">
+            ✏️ Edit
           </button>
-        ) : (
-          <span className={cn("text-[13px] font-bold tabular-nums", isIncome ? "text-green" : "text-text")}>
-            {isIncome ? "+" : ""}{formatMoney(expense.amount)}
-          </span>
-        )}
-      </div>
+          {confirmDelete ? (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
+                className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold text-text2 hover:bg-surface2">
+                Cancel
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                className="flex-1 rounded-lg bg-red py-2 text-xs font-bold text-white">
+                Yes, Delete
+              </button>
+            </>
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-red/20 py-2 text-xs font-semibold text-red hover:bg-red-bg transition-colors">
+              <Trash2 size={12} /> Delete
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Edit form */}
+      {expanded && editing && (
+        <div className="px-3 pb-3 space-y-2 anim-fade">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-text3 font-bold">₹</span>
+              <input type="number" value={editAmt} onChange={(e) => setEditAmt(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface2 pl-6 pr-2 py-2 text-sm font-bold text-text outline-none focus:border-accent tabular-nums" />
+            </div>
+            <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Description"
+              className="flex-1 rounded-lg border border-border bg-surface2 px-2.5 py-2 text-sm text-text outline-none focus:border-accent" />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {CATEGORIES.map((cat) => (
+              <button key={cat} onClick={() => setEditCat(cat)}
+                className={cn("rounded-full px-2 py-1 text-[10px] font-semibold border transition-all",
+                  editCat === cat ? "border-accent bg-accent-bg text-accent" : "border-border text-text3")}>
+                {getCategoryEmoji(cat)} {getCategoryName(cat)}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setEditing(false)} className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold text-text2">Cancel</button>
+            <button onClick={handleEdit} className="flex-1 rounded-lg bg-accent py-2 text-xs font-bold text-white">Save</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -733,6 +807,7 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
   const [category, setCategory] = useState("");
   const [date, setDate] = useState(toDateStr(new Date()));
   const [isIncome, setIsIncome] = useState(false);
+  const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -755,6 +830,7 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       amount: amt, description: finalDesc, category: category || detectedCategory,
       type: isIncome ? "income" : "expense", date,
+      location: location || undefined,
       time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
       createdAt: now.toISOString(),
     };
@@ -838,6 +914,32 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
                 <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-1 block">Date</label>
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
                   className="w-full rounded-xl border border-border bg-surface2 px-4 py-3 text-sm text-text outline-none focus:border-accent" />
+              </div>
+
+              {/* Optional location */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold text-text3 uppercase tracking-wider">📍 Location (optional)</label>
+                  <button type="button" onClick={() => {
+                    if ("geolocation" in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        async (pos) => {
+                          try {
+                            const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`);
+                            const data = await r.json();
+                            const place = data.address?.suburb || data.address?.neighbourhood || data.address?.city_district || data.address?.city || "";
+                            if (place) setLocation(place);
+                          } catch { setLocation(`${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`); }
+                        },
+                        () => {},
+                        { enableHighAccuracy: false, timeout: 5000 }
+                      );
+                    }
+                  }} className="text-[10px] font-semibold text-accent hover:underline">Auto-detect</button>
+                </div>
+                <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. Koramangala, MG Road, College"
+                  className="w-full rounded-xl border border-border bg-surface2 px-4 py-2.5 text-sm text-text outline-none focus:border-accent" />
               </div>
 
               <button onClick={handleSave} disabled={saving || !amount || parseFloat(amount) <= 0}

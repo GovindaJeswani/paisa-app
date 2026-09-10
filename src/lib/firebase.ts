@@ -70,6 +70,7 @@ export async function syncToCloud(userId: string): Promise<number> {
       type: exp.type || "expense",
       date: exp.date,
       time: exp.time,
+      location: exp.location || null,
       createdAt: exp.createdAt,
     });
     count++;
@@ -95,6 +96,7 @@ export async function syncFromCloud(userId: string): Promise<number> {
       type: data.type || "expense",
       date: data.date,
       time: data.time,
+      location: data.location || undefined,
       createdAt: data.createdAt,
     };
     await localDb.expenses.put(expense); // put = upsert
@@ -114,6 +116,7 @@ export async function syncExpenseToCloud(userId: string, expense: Expense): Prom
     type: expense.type || "expense",
     date: expense.date,
     time: expense.time,
+    location: expense.location || null,
     createdAt: expense.createdAt,
   });
 }
@@ -140,6 +143,7 @@ export function listenToCloudChanges(userId: string, onUpdate: () => void): () =
           type: data.type || "expense",
           date: data.date,
           time: data.time,
+          location: data.location || undefined,
           createdAt: data.createdAt,
         });
       } else if (change.type === "removed") {
