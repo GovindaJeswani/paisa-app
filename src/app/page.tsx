@@ -12,6 +12,7 @@ import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCa
 import { cn, formatMoney, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
 import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured } from "@/lib/firebase";
 import { FriendSplitSection } from "@/components/splits";
+import { ReportSheet } from "@/components/report";
 import type { User } from "firebase/auth";
 
 // ── init DB settings on load ──
@@ -23,6 +24,7 @@ export default function Home() {
   const [showQuick, setShowQuick] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [showSplit, setShowSplit] = useState(false);
   const [tab, setTab] = useState<"home" | "calendar">("home");
   const [user, setUser] = useState<User | null>(null);
@@ -32,6 +34,13 @@ export default function Home() {
   useEffect(() => {
     const unsub = onAuthChange((u) => setUser(u));
     return unsub;
+  }, []);
+
+  // Listen for report open from settings
+  useEffect(() => {
+    const handler = () => setShowReport(true);
+    document.addEventListener("open-report", handler);
+    return () => document.removeEventListener("open-report", handler);
   }, []);
 
   // Real-time cloud sync listener
@@ -57,7 +66,7 @@ export default function Home() {
 
   return (
     <>
-      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} onSearch={() => setShowSearch(true)} onSettings={() => setShowSettings(true)} user={user} syncing={syncing} onSync={handleSync} /> : <CalendarTab />}
+      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} onSearch={() => setShowSearch(true)} onSettings={() => setShowSettings(true)} onReport={() => setShowReport(true)} user={user} syncing={syncing} onSync={handleSync} /> : <CalendarTab />}
 
       {/* Bottom nav */}
       <nav className="sticky bottom-0 border-t border-border bg-surface/80 backdrop-blur-xl flex safe-b">
@@ -85,6 +94,7 @@ export default function Home() {
       {showQuick && <QuickNumpad onClose={() => setShowQuick(false)} />}
       {showSearch && <SearchSheet onClose={() => setShowSearch(false)} />}
       {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
+      {showReport && <ReportSheet onClose={() => setShowReport(false)} />}
     </>
   );
 }
@@ -191,7 +201,7 @@ function CollapsibleDay({ date, items, daySpent, dayIncome, defaultOpen }: {
   );
 }
 
-function HomeTab({ onSMS, onSearch, onSettings, user, syncing, onSync }: { onSMS: () => void; onSearch: () => void; onSettings: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
+function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync }: { onSMS: () => void; onSearch: () => void; onSettings: () => void; onReport: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
   const now = new Date();
   const ms = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const me = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-31`;
@@ -898,6 +908,18 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
+  const descSuggestions = useLiveQuery(async () => {
+    const exps = await db.expenses.orderBy("createdAt").reverse().limit(200).toArray();
+    const counts = new Map<string, number>();
+    for (const e of exps) { const d = e.description.trim(); if (d.length > 1) counts.set(d, (counts.get(d) || 0) + 1); }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([d]) => d);
+  }) ?? [];
+  const locSuggestions = useLiveQuery(async () => {
+    const exps = await db.expenses.toArray();
+    const s = new Set<string>();
+    for (const e of exps) if (e.location) s.add(e.location);
+    return [...s, "Home", "Office", "College", "Hostel", "Canteen", "Mall", "Market", "Station"].filter((v, i, a) => a.indexOf(v) === i);
+  }) ?? [];
 
   useEffect(() => { setTimeout(() => amountRef.current?.focus(), 100); }, []);
   const detectedCategory = useMemo(() => guessCategory(desc), [desc]);
@@ -996,8 +1018,19 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
 
               <div>
                 <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-1 block">What was it for?</label>
-                <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={isIncome ? "e.g. Salary, Freelance, Cashback" : "e.g. Evening snacks, Uber, Coffee"}
-                  className="w-full rounded-xl border border-border bg-surface2 px-4 py-3 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+                <div className="relative">
+                  <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={isIncome ? "e.g. Salary, Freelance, Cashback" : "e.g. Evening snacks, Uber, Coffee"}
+                    className="w-full rounded-xl border border-border bg-surface2 px-4 py-3 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
+                  {desc.trim().length >= 1 && descSuggestions.filter((s) => s.toLowerCase().includes(desc.toLowerCase()) && s.toLowerCase() !== desc.toLowerCase()).length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-10 mt-1 rounded-xl border border-border bg-surface shadow-lg max-h-32 overflow-y-auto">
+                      {descSuggestions.filter((s) => s.toLowerCase().includes(desc.toLowerCase()) && s.toLowerCase() !== desc.toLowerCase()).slice(0, 5).map((s) => (
+                        <button key={s} onClick={() => setDesc(s)} className="w-full px-3 py-2 text-left text-sm text-text hover:bg-surface2 first:rounded-t-xl last:rounded-b-xl">
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {desc.trim() && (
                   <div className="mt-1.5 flex items-center gap-1.5 text-xs text-text2 anim-fade">
                     <span className="text-sm">{getCategoryEmoji(detectedCategory)}</span>
@@ -1051,9 +1084,20 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
                     }
                   }} className="text-[10px] font-semibold text-accent hover:underline">Auto-detect</button>
                 </div>
-                <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Koramangala, MG Road, College"
-                  className="w-full rounded-xl border border-border bg-surface2 px-4 py-2.5 text-sm text-text outline-none focus:border-accent" />
+                <div className="relative">
+                  <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Koramangala, MG Road, College"
+                    className="w-full rounded-xl border border-border bg-surface2 px-4 py-2.5 text-sm text-text outline-none focus:border-accent" />
+                  {location.trim().length >= 1 && locSuggestions.filter((s) => s.toLowerCase().includes(location.toLowerCase()) && s.toLowerCase() !== location.toLowerCase()).length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-10 mt-1 rounded-xl border border-border bg-surface shadow-lg max-h-28 overflow-y-auto">
+                      {locSuggestions.filter((s) => s.toLowerCase().includes(location.toLowerCase()) && s.toLowerCase() !== location.toLowerCase()).slice(0, 5).map((s) => (
+                        <button key={s} onClick={() => setLocation(s)} className="w-full px-3 py-2 text-left text-sm text-text hover:bg-surface2 first:rounded-t-xl last:rounded-b-xl">
+                          📍 {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Payment mode */}
@@ -1356,15 +1400,21 @@ function SettingsSheet({ onClose }: { onClose: () => void }) {
           {/* Export */}
           <div>
             <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-2 block">Export Data</label>
-            <div className="flex gap-2">
-              <button onClick={handleExportCSV}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-xs font-semibold text-text2 hover:bg-surface2">
-                <Download size={14} /> CSV (Excel)
+            <div className="space-y-2">
+              <button onClick={() => { onClose(); setTimeout(() => document.dispatchEvent(new CustomEvent("open-report")), 100); }}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-accent py-2.5 text-sm font-bold text-white">
+                📊 Monthly Report
               </button>
-              <button onClick={handleExportJSON}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-xs font-semibold text-text2 hover:bg-surface2">
-                <Download size={14} /> JSON Backup
-              </button>
+              <div className="flex gap-2">
+                <button onClick={handleExportCSV}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-xs font-semibold text-text2 hover:bg-surface2">
+                  <Download size={14} /> CSV (Excel)
+                </button>
+                <button onClick={handleExportJSON}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-xs font-semibold text-text2 hover:bg-surface2">
+                  <Download size={14} /> JSON Backup
+                </button>
+              </div>
             </div>
             {exported && <p className="text-[11px] text-green font-semibold mt-1 anim-fade">✓ Downloaded!</p>}
           </div>

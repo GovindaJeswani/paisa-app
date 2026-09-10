@@ -166,6 +166,8 @@ function MultiSplitSheet({ onClose, friendSuggestions }: { onClose: () => void; 
   const [friends, setFriends] = useState<string[]>([""]);
   const [includeMe, setIncludeMe] = useState(true);
   const [whoPaid, setWhoPaid] = useState<"me" | number>("me");
+  const [splitMode, setSplitMode] = useState<"equal" | "custom">("equal");
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
 
   const totalPeople = friends.filter((f) => f.trim()).length + (includeMe ? 1 : 0);
   const perPerson = totalPeople > 0 ? Math.round(parseFloat(totalAmount) / totalPeople) : 0;
@@ -179,9 +181,10 @@ function MultiSplitSheet({ onClose, friendSuggestions }: { onClose: () => void; 
 
     if (whoPaid === "me") {
       for (const friend of validFriends) {
+        const amt = splitMode === "custom" ? (parseFloat(customAmounts[friend]) || perPerson) : perPerson;
         await db.splits.add({
           id: `split_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
-          friendName: friend.trim(), amount: perPerson,
+          friendName: friend.trim(), amount: amt,
           description: description || `Split ₹${total}`,
           date: dateStr, settled: false, createdAt: now.toISOString(),
         });
@@ -189,9 +192,10 @@ function MultiSplitSheet({ onClose, friendSuggestions }: { onClose: () => void; 
     } else {
       const payer = validFriends[whoPaid as number];
       if (payer) {
+        const myShare = splitMode === "custom" ? (parseFloat(customAmounts["me"]) || perPerson) : perPerson;
         await db.splits.add({
           id: `split_${Date.now()}_me`,
-          friendName: payer.trim(), amount: -perPerson,
+          friendName: payer.trim(), amount: -myShare,
           description: description || `Split ₹${total}`,
           date: dateStr, settled: false, createdAt: now.toISOString(),
         });
@@ -271,6 +275,58 @@ function MultiSplitSheet({ onClose, friendSuggestions }: { onClose: () => void; 
               <Plus size={12} /> Add friend
             </button>
           </div>
+
+          {/* Split mode */}
+          <div className="flex gap-2">
+            <button onClick={() => setSplitMode("equal")}
+              className={cn("flex-1 rounded-xl py-2.5 text-xs font-bold border transition-all",
+                splitMode === "equal" ? "border-accent bg-accent-bg text-accent" : "border-border text-text3")}>
+              Equal split
+            </button>
+            <button onClick={() => setSplitMode("custom")}
+              className={cn("flex-1 rounded-xl py-2.5 text-xs font-bold border transition-all",
+                splitMode === "custom" ? "border-accent bg-accent-bg text-accent" : "border-border text-text3")}>
+              Custom amounts
+            </button>
+          </div>
+
+          {/* Custom amounts input */}
+          {splitMode === "custom" && parseFloat(totalAmount) > 0 && (
+            <div className="rounded-xl bg-surface2 p-3 space-y-2">
+              <p className="text-[10px] font-bold text-text3 uppercase">Enter each person's share</p>
+              {includeMe && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-text flex-1">You</span>
+                  <div className="relative w-24">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-text3">₹</span>
+                    <input type="number" value={customAmounts["me"] || ""} onChange={(e) => setCustomAmounts({ ...customAmounts, me: e.target.value })}
+                      placeholder={String(perPerson)}
+                      className="w-full rounded-lg border border-border bg-surface pl-5 pr-2 py-1.5 text-xs font-bold text-text outline-none focus:border-accent tabular-nums" />
+                  </div>
+                </div>
+              )}
+              {friends.filter((f) => f.trim()).map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-sm text-text flex-1">{f}</span>
+                  <div className="relative w-24">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-text3">₹</span>
+                    <input type="number" value={customAmounts[f] || ""} onChange={(e) => setCustomAmounts({ ...customAmounts, [f]: e.target.value })}
+                      placeholder={String(perPerson)}
+                      className="w-full rounded-lg border border-border bg-surface pl-5 pr-2 py-1.5 text-xs font-bold text-text outline-none focus:border-accent tabular-nums" />
+                  </div>
+                </div>
+              ))}
+              {(() => {
+                const customTotal = Object.values(customAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+                const diff = parseFloat(totalAmount) - customTotal;
+                return diff !== 0 && customTotal > 0 ? (
+                  <p className={cn("text-[10px] font-bold", Math.abs(diff) < 1 ? "text-green" : "text-red")}>
+                    {diff > 0 ? `₹${Math.round(diff)} unassigned` : `₹${Math.round(Math.abs(diff))} over`}
+                  </p>
+                ) : null;
+              })()}
+            </div>
+          )}
 
           {parseFloat(totalAmount) > 0 && totalPeople >= 2 && (
             <div className="rounded-xl bg-surface2 p-3">
