@@ -5,10 +5,12 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   Plus, Calendar, ChevronLeft, ChevronRight, X, Trash2, ArrowDown, ArrowUp,
   LayoutGrid, List, Clock, MessageSquare, Check, Loader2, Sun, Moon,
-  TrendingUp, TrendingDown, Target, RotateCcw,
+  TrendingUp, TrendingDown, Target, RotateCcw, LogIn, LogOut, Cloud, CloudOff, RefreshCw,
 } from "lucide-react";
 import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCategoryEmoji, getCategoryName, initSettings, type Expense } from "@/lib/db";
 import { cn, formatMoney, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
+import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 
 // ── init DB settings on load ──
 if (typeof window !== "undefined") initSettings();
@@ -18,10 +20,39 @@ export default function Home() {
   const [showSMS, setShowSMS] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
   const [tab, setTab] = useState<"home" | "calendar">("home");
+  const [user, setUser] = useState<User | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  // Auth listener
+  useEffect(() => {
+    const unsub = onAuthChange((u) => setUser(u));
+    return unsub;
+  }, []);
+
+  // Real-time cloud sync listener
+  useEffect(() => {
+    if (!user) return;
+    const unsub = listenToCloudChanges(user.uid, () => {
+      // Dexie live queries will auto-update the UI
+    });
+    return unsub;
+  }, [user]);
+
+  const handleSync = useCallback(async () => {
+    if (!user) return;
+    setSyncing(true);
+    try {
+      await syncToCloud(user.uid);
+      await syncFromCloud(user.uid);
+    } catch (err) {
+      console.error("Sync failed:", err);
+    }
+    setSyncing(false);
+  }, [user]);
 
   return (
     <>
-      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} /> : <CalendarTab />}
+      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} user={user} syncing={syncing} onSync={handleSync} /> : <CalendarTab />}
 
       {/* Bottom nav */}
       <nav className="sticky bottom-0 border-t border-border bg-surface/80 backdrop-blur-xl flex safe-b">
@@ -79,7 +110,56 @@ function DarkToggle() {
 // HOME TAB — with pie chart, daily limit, streaks, income
 // ════════════════════════════════════════════════════════
 
-function HomeTab({ onSMS }: { onSMS: () => void }) {
+// ── Daily money tips (rotates daily, no API needed) ──
+const MONEY_TIPS = [
+  { emoji: "💡", tip: "The 50/30/20 rule: 50% needs, 30% wants, 20% savings." },
+  { emoji: "🎯", tip: "Pay yourself first — save before you spend." },
+  { emoji: "☕", tip: "₹100/day on chai = ₹36,500/year. Small amounts add up." },
+  { emoji: "📱", tip: "Review your subscriptions monthly. Cancel what you don't use." },
+  { emoji: "🛒", tip: "Make a list before shopping. Impulse buys kill budgets." },
+  { emoji: "💰", tip: "Emergency fund = 3 months of expenses. Start small." },
+  { emoji: "📊", tip: "Track every expense for 30 days. You'll be surprised." },
+  { emoji: "🍔", tip: "Cooking at home saves 60-70% vs ordering food delivery." },
+  { emoji: "🚌", tip: "Public transport vs cabs can save ₹5,000+ per month." },
+  { emoji: "💳", tip: "Credit card? Pay the full bill. Minimum payments are a trap." },
+  { emoji: "🎓", tip: "Invest in skills. The best ROI is investing in yourself." },
+  { emoji: "⏰", tip: "Wait 24 hours before any purchase over ₹1,000." },
+  { emoji: "📈", tip: "Start a SIP with even ₹500/month. Time in market > timing." },
+  { emoji: "🏷️", tip: "Use cashback apps and discount coupons. Free money." },
+  { emoji: "🤝", tip: "Split bills fairly. Use apps to avoid awkward conversations." },
+  { emoji: "📅", tip: "Set bill payment reminders. Late fees are wasted money." },
+  { emoji: "🎁", tip: "Experiences > things. Memories last longer than purchases." },
+  { emoji: "🏠", tip: "Follow the 30% rule: rent should be ≤30% of income." },
+  { emoji: "📝", tip: "Write your financial goals. Written goals are 42% more likely to happen." },
+  { emoji: "🔒", tip: "Don't share UPI PIN or OTP. No bank ever asks for it." },
+  { emoji: "⛽", tip: "Combine errands to save on fuel and auto fares." },
+  { emoji: "🌙", tip: "Sleep on big purchases. Morning clarity saves money." },
+  { emoji: "🎮", tip: "Free entertainment exists: parks, libraries, open-source games." },
+  { emoji: "💪", tip: "Financial fitness is like gym. Consistency beats intensity." },
+  { emoji: "📉", tip: "Market crashes are sales. Don't panic sell your SIPs." },
+  { emoji: "🧮", tip: "Know your hourly rate. Is that purchase worth X hours of work?" },
+  { emoji: "🌱", tip: "Grow your income, not just cut expenses. Both matter." },
+  { emoji: "🎯", tip: "Name your savings goals. 'Goa fund' > 'savings account'." },
+  { emoji: "📱", tip: "Uninstall shopping apps for a week. See what happens." },
+  { emoji: "💸", tip: "Your biggest expense is the one you don't track." },
+];
+
+function DailyTip() {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  const tip = MONEY_TIPS[dayOfYear % MONEY_TIPS.length];
+
+  return (
+    <div className="mt-3 rounded-xl bg-orange-bg/50 border border-orange/10 p-3 flex items-start gap-2.5">
+      <span className="text-lg mt-0.5">{tip.emoji}</span>
+      <div>
+        <p className="text-[10px] font-bold text-orange uppercase tracking-wider">Daily money tip</p>
+        <p className="text-[12px] text-text2 mt-0.5 leading-relaxed">{tip.tip}</p>
+      </div>
+    </div>
+  );
+}
+
+function HomeTab({ onSMS, user, syncing, onSync }: { onSMS: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
   const now = new Date();
   const ms = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const me = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-31`;
@@ -143,7 +223,25 @@ function HomeTab({ onSMS }: { onSMS: () => void }) {
       <div className="flex items-center justify-between mb-1">
         <p className="text-sm text-text2">{getGreeting()} 👋</p>
         <div className="flex items-center gap-1">
-          {streak > 1 && <span className="text-xs font-bold text-orange bg-orange-bg px-2 py-0.5 rounded-full">🔥 {streak} days</span>}
+          {streak > 1 && <span className="text-xs font-bold text-orange bg-orange-bg px-2 py-0.5 rounded-full">🔥 {streak}d</span>}
+          {/* Sync button */}
+          {user && (
+            <button onClick={onSync} disabled={syncing} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-surface2 transition-colors">
+              {syncing ? <Loader2 size={16} className="text-accent animate-spin" /> : <Cloud size={16} className="text-green" />}
+            </button>
+          )}
+          {/* Google login/logout */}
+          {isFirebaseConfigured() && (
+            user ? (
+              <button onClick={signOutUser} className="h-8 flex items-center gap-1.5 rounded-full bg-surface2 px-2 pr-2.5">
+                {user.photoURL ? <img src={user.photoURL} className="h-5 w-5 rounded-full" alt="" /> : <div className="h-5 w-5 rounded-full bg-accent text-white text-[9px] font-bold flex items-center justify-center">{user.displayName?.[0]}</div>}
+              </button>
+            ) : (
+              <button onClick={async () => { await signInWithGoogle(); }} className="h-8 flex items-center gap-1 rounded-full bg-surface2 px-2.5 text-[10px] font-semibold text-text2 hover:bg-accent-bg hover:text-accent transition-colors">
+                <LogIn size={12} /> Sign in
+              </button>
+            )
+          )}
           <DarkToggle />
         </div>
       </div>
@@ -196,6 +294,9 @@ function HomeTab({ onSMS }: { onSMS: () => void }) {
         </div>
         <ChevronRight size={14} className="text-accent" />
       </button>
+
+      {/* Daily money tip */}
+      <DailyTip />
 
       {/* 7-day bar chart */}
       {monthExpenses.length > 0 && (
@@ -631,16 +732,21 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
 
   const handleSave = useCallback(async () => {
     const amt = parseFloat(amount);
-    if (!amt || amt <= 0 || !desc.trim()) return;
+    if (!amt || amt <= 0) return;
     setSaving(true);
     const now = new Date();
-    await db.expenses.add({
+    const finalDesc = desc.trim() || getCategoryName(category || detectedCategory);
+    const expense: Expense = {
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      amount: amt, description: desc.trim(), category: category || detectedCategory,
+      amount: amt, description: finalDesc, category: category || detectedCategory,
       type: isIncome ? "income" : "expense", date,
       time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
       createdAt: now.toISOString(),
-    });
+    };
+    await db.expenses.add(expense);
+    // Sync to cloud if logged in
+    const u = getCurrentUser();
+    if (u) syncExpenseToCloud(u.uid, expense).catch(() => {});
     setSaved(true);
     setTimeout(onClose, 600);
   }, [amount, desc, category, date, isIncome, detectedCategory, onClose]);
@@ -719,7 +825,7 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
                   className="w-full rounded-xl border border-border bg-surface2 px-4 py-3 text-sm text-text outline-none focus:border-accent" />
               </div>
 
-              <button onClick={handleSave} disabled={saving || !amount || parseFloat(amount) <= 0 || !desc.trim()}
+              <button onClick={handleSave} disabled={saving || !amount || parseFloat(amount) <= 0}
                 className={cn("w-full rounded-xl py-3.5 text-sm font-bold text-white disabled:opacity-40 active:scale-[0.98] transition-all",
                   isIncome ? "bg-green hover:bg-green/90" : "bg-accent hover:bg-accent/90")}>
                 {saving ? "Saving..." : isIncome ? "Add Income" : "Add Expense"}
