@@ -15,8 +15,33 @@ import { FriendSplitSection } from "@/components/splits";
 import { ReportSheet } from "@/components/report";
 import type { User } from "firebase/auth";
 
-// ── init DB settings on load ──
-if (typeof window !== "undefined") initSettings();
+// ── init DB settings on load + request notification permission ──
+if (typeof window !== "undefined") {
+  initSettings();
+  // Request notification permission on first load
+  if ("Notification" in window && Notification.permission === "default") {
+    setTimeout(() => Notification.requestPermission(), 5000);
+  }
+  // Schedule periodic check for reminders
+  setInterval(() => {
+    if (Notification.permission !== "granted") return;
+    const h = new Date().getHours();
+    const lastReminder = localStorage.getItem("paisa-last-reminder");
+    const now = Date.now();
+    // Only send once every 6 hours
+    if (lastReminder && now - parseInt(lastReminder) < 6 * 60 * 60 * 1000) return;
+    // Evening reminder (8-9 PM)
+    if (h >= 20 && h < 21) {
+      new Notification("Paisa 💸", { body: "Don't forget to log today's expenses!", icon: "/icons/icon-192.svg" });
+      localStorage.setItem("paisa-last-reminder", String(now));
+    }
+    // Afternoon reminder (1-2 PM)
+    if (h >= 13 && h < 14) {
+      new Notification("Paisa 💸", { body: "Had lunch? Track it before you forget!", icon: "/icons/icon-192.svg" });
+      localStorage.setItem("paisa-last-reminder", String(now));
+    }
+  }, 60 * 1000); // Check every minute
+}
 
 export default function Home() {
   const [showAdd, setShowAdd] = useState(false);
@@ -203,6 +228,8 @@ function CollapsibleDay({ date, items, daySpent, dayIncome, defaultOpen }: {
 
 function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync }: { onSMS: () => void; onSearch: () => void; onSettings: () => void; onReport: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
   const now = new Date();
+  const [sortOrder, setSortOrder] = useState<"time" | "amount_high" | "amount_low">("time");
+  const [filterCat, setFilterCat] = useState<string | null>(null);
   const ms = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const me = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-31`;
   const todayStr = toDateStr(now);
@@ -241,12 +268,17 @@ function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync 
 
   // Group by date
   const grouped = useMemo(() => {
+    let filtered = expenses;
+    if (filterCat) filtered = filtered.filter((e) => normalizeCategoryForChart(e.category) === filterCat);
     const map = new Map<string, Expense[]>();
-    for (const e of expenses) { const arr = map.get(e.date) || []; arr.push(e); map.set(e.date, arr); }
-    // Sort within each day by time descending (latest first)
-    for (const [, items] of map) items.sort((a, b) => (b.time || "").localeCompare(a.time || ""));
+    for (const e of filtered) { const arr = map.get(e.date) || []; arr.push(e); map.set(e.date, arr); }
+    for (const [, items] of map) {
+      if (sortOrder === "amount_high") items.sort((a, b) => b.amount - a.amount);
+      else if (sortOrder === "amount_low") items.sort((a, b) => a.amount - b.amount);
+      else items.sort((a, b) => (b.time || "").localeCompare(a.time || ""));
+    }
     return Array.from(map.entries());
-  }, [expenses]);
+  }, [expenses, sortOrder, filterCat]);
 
   // Category breakdown (expenses only)
   const catBreakdown = useMemo(() => {
@@ -445,12 +477,90 @@ function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync 
         </div>
       )}
 
+      {/* Filter & sort bar */}
+      {expenses.length > 0 && (
+        <div className="mt-4 flex items-center gap-2">
+          {/* Category filter chips */}
+          <div className="flex-1 flex gap-1 overflow-x-auto hide-scroll pb-0.5">
+            <button onClick={() => setFilterCat(null)}
+              className={cn("shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold border transition-all",
+                !filterCat ? "border-accent bg-accent-bg text-accent" : "border-border text-text3")}>
+              All
+            </button>
+            {catBreakdown.slice(0, 5).map((c) => (
+              <button key={c.name} onClick={() => setFilterCat(filterCat === c.name ? null : c.name)}
+                className={cn("shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold border transition-all whitespace-nowrap",
+                  filterCat === c.name ? "border-accent bg-accent-bg text-accent" : "border-border text-text3")}>
+                {c.emoji} {c.name}
+              </button>
+            ))}
+          </div>
+          {/* Sort toggle */}
+          <button onClick={() => setSortOrder(sortOrder === "time" ? "amount_high" : sortOrder === "amount_high" ? "amount_low" : "time")}
+            className="shrink-0 rounded-lg border border-border px-2 py-1 text-[10px] font-semibold text-text3 hover:bg-surface2">
+            {sortOrder === "time" ? "🕐 Time" : sortOrder === "amount_high" ? "↓ High" : "↑ Low"}
+          </button>
+        </div>
+      )}
+
       {/* Expense list */}
       {grouped.length === 0 ? (
-        <div className="mt-14 text-center anim-fade">
-          <p className="text-4xl">💸</p>
-          <p className="text-base font-bold text-text mt-3">No expenses yet</p>
-          <p className="text-sm text-text2 mt-1">Tap <span className="text-accent font-bold">+</span> to add your first one</p>
+        <div className="mt-10 text-center anim-fade">
+          <p className="text-5xl mb-4">💸</p>
+          <p className="text-lg font-bold text-text">Welcome to Paisa!</p>
+          <p className="text-sm text-text2 mt-1 max-w-[260px] mx-auto">Track your daily expenses effortlessly. Just tap + to add your first expense.</p>
+
+          <div className="mt-6 space-y-3 max-w-[280px] mx-auto text-left">
+            <div className="flex items-center gap-3 rounded-xl bg-surface2 p-3">
+              <span className="text-lg">➕</span>
+              <div><p className="text-[12px] font-bold text-text">Add expense</p><p className="text-[10px] text-text3">Tap the + button, enter amount & category</p></div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-surface2 p-3">
+              <span className="text-lg">📅</span>
+              <div><p className="text-[12px] font-bold text-text">Calendar view</p><p className="text-[10px] text-text3">See daily spending on a calendar</p></div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-surface2 p-3">
+              <span className="text-lg">👥</span>
+              <div><p className="text-[12px] font-bold text-text">Split bills</p><p className="text-[10px] text-text3">Track who owes who among friends</p></div>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-surface2 p-3">
+              <span className="text-lg">📊</span>
+              <div><p className="text-[12px] font-bold text-text">Reports</p><p className="text-[10px] text-text3">Monthly breakdown, charts, export</p></div>
+            </div>
+          </div>
+
+          {/* Load demo data */}
+          <button onClick={async () => {
+            const now2 = new Date();
+            const demoItems = [
+              { desc: "Morning chai", cat: "☕ Chai/Coffee", amt: 30 },
+              { desc: "Auto to office", cat: "🛺 Transport", amt: 50 },
+              { desc: "Lunch thali", cat: "🍱 Food", amt: 120 },
+              { desc: "Coffee", cat: "☕ Chai/Coffee", amt: 80 },
+              { desc: "Uber home", cat: "🚖 Transport", amt: 150 },
+              { desc: "Swiggy dinner", cat: "📦 Food", amt: 250 },
+              { desc: "Netflix", cat: "📺 Fun", amt: 649 },
+              { desc: "Groceries Blinkit", cat: "🛒 Groceries", amt: 430 },
+              { desc: "Phone recharge", cat: "📶 Bills", amt: 299 },
+              { desc: "Haircut", cat: "💈 Personal", amt: 200 },
+            ];
+            for (let d = 0; d < 3; d++) {
+              for (const item of demoItems.slice(0, 4 + Math.floor(Math.random() * 4))) {
+                const date = new Date(now2.getTime() - d * 86400000);
+                const h = 7 + Math.floor(Math.random() * 14);
+                const m = Math.floor(Math.random() * 60);
+                await db.expenses.add({
+                  id: `demo_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                  amount: item.amt + Math.floor(Math.random() * 30),
+                  description: item.desc, category: item.cat, type: "expense",
+                  date: toDateStr(date), time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+                  paymentMode: "upi", createdAt: date.toISOString(),
+                });
+              }
+            }
+          }} className="mt-6 rounded-xl bg-accent-bg text-accent px-5 py-2.5 text-sm font-bold hover:bg-accent hover:text-white transition-colors">
+            🎮 Load demo data to explore
+          </button>
         </div>
       ) : (
         <div className="mt-4 space-y-3">
@@ -907,6 +1017,8 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
   const [location, setLocation] = useState("");
   const [paymentMode, setPaymentMode] = useState<string>("upi");
   const [photo, setPhoto] = useState<string | null>(null);
+  const [descFocused, setDescFocused] = useState(false);
+  const [locFocused, setLocFocused] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -1021,12 +1133,18 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
               <div>
                 <label className="text-[10px] font-bold text-text3 uppercase tracking-wider mb-1 block">What was it for?</label>
                 <div className="relative">
-                  <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={isIncome ? "e.g. Salary, Freelance, Cashback" : "e.g. Evening snacks, Uber, Coffee"}
+                  <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)}
+                    onFocus={() => setDescFocused(true)} onBlur={() => setTimeout(() => setDescFocused(false), 200)}
+                    placeholder={isIncome ? "e.g. Salary, Freelance, Cashback" : "e.g. Evening snacks, Uber, Coffee"}
                     className="w-full rounded-xl border border-border bg-surface2 px-4 py-3 text-sm text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
-                  {desc.trim().length >= 1 && descSuggestions.filter((s) => s.toLowerCase().includes(desc.toLowerCase()) && s.toLowerCase() !== desc.toLowerCase()).length > 0 && (
+                  {descFocused && descSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-10 mt-1 rounded-xl border border-border bg-surface shadow-lg max-h-32 overflow-y-auto">
-                      {descSuggestions.filter((s) => s.toLowerCase().includes(desc.toLowerCase()) && s.toLowerCase() !== desc.toLowerCase()).slice(0, 5).map((s) => (
-                        <button key={s} onClick={() => setDesc(s)} className="w-full px-3 py-2 text-left text-sm text-text hover:bg-surface2 first:rounded-t-xl last:rounded-b-xl">
+                      {descSuggestions
+                        .filter((s) => !desc.trim() || (s.toLowerCase().includes(desc.toLowerCase()) && s.toLowerCase() !== desc.toLowerCase()))
+                        .slice(0, 6)
+                        .map((s) => (
+                        <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setDesc(s); setDescFocused(false); }}
+                          className="w-full px-3 py-2 text-left text-sm text-text hover:bg-surface2 first:rounded-t-xl last:rounded-b-xl">
                           {s}
                         </button>
                       ))}
@@ -1088,12 +1206,17 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="relative">
                   <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
+                    onFocus={() => setLocFocused(true)} onBlur={() => setTimeout(() => setLocFocused(false), 200)}
                     placeholder="e.g. Koramangala, MG Road, College"
                     className="w-full rounded-xl border border-border bg-surface2 px-4 py-2.5 text-sm text-text outline-none focus:border-accent" />
-                  {location.trim().length >= 1 && locSuggestions.filter((s) => s.toLowerCase().includes(location.toLowerCase()) && s.toLowerCase() !== location.toLowerCase()).length > 0 && (
+                  {locFocused && locSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 z-10 mt-1 rounded-xl border border-border bg-surface shadow-lg max-h-28 overflow-y-auto">
-                      {locSuggestions.filter((s) => s.toLowerCase().includes(location.toLowerCase()) && s.toLowerCase() !== location.toLowerCase()).slice(0, 5).map((s) => (
-                        <button key={s} onClick={() => setLocation(s)} className="w-full px-3 py-2 text-left text-sm text-text hover:bg-surface2 first:rounded-t-xl last:rounded-b-xl">
+                      {locSuggestions
+                        .filter((s) => !location.trim() || (s.toLowerCase().includes(location.toLowerCase()) && s.toLowerCase() !== location.toLowerCase()))
+                        .slice(0, 5)
+                        .map((s) => (
+                        <button key={s} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => { setLocation(s); setLocFocused(false); }}
+                          className="w-full px-3 py-2 text-left text-sm text-text hover:bg-surface2 first:rounded-t-xl last:rounded-b-xl">
                           📍 {s}
                         </button>
                       ))}
