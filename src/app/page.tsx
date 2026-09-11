@@ -9,7 +9,7 @@ import {
   Search, Settings, CreditCard, Repeat, Download, Camera, ChevronDown, Users,
 } from "lucide-react";
 import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCategoryEmoji, getCategoryName, normalizeCategoryForChart, initSettings, getSettings, PAYMENT_MODES, FUN_FACTS, type Expense, type FriendSplit } from "@/lib/db";
-import { cn, formatMoney, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
+import { cn, formatMoney, formatTime12, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
 import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured } from "@/lib/firebase";
 import { FriendSplitSection } from "@/components/splits";
 import { ReportSheet } from "@/components/report";
@@ -243,6 +243,8 @@ function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync 
   const grouped = useMemo(() => {
     const map = new Map<string, Expense[]>();
     for (const e of expenses) { const arr = map.get(e.date) || []; arr.push(e); map.set(e.date, arr); }
+    // Sort within each day by time descending (latest first)
+    for (const [, items] of map) items.sort((a, b) => (b.time || "").localeCompare(a.time || ""));
     return Array.from(map.entries());
   }, [expenses]);
 
@@ -576,7 +578,7 @@ function ExpenseRow({ expense }: { expense: Expense }) {
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-text truncate">{expense.description}</p>
           <p className="text-[11px] text-text3">
-            {getCategoryName(expense.category)} · {expense.time}
+            {getCategoryName(expense.category)} · {formatTime12(expense.time)}
             {expense.paymentMode ? ` · ${PAYMENT_MODES.find((m) => m.value === expense.paymentMode)?.emoji || ""}` : ""}
             {expense.location ? ` · 📍${expense.location}` : ""}
           </p>
@@ -862,7 +864,7 @@ function CalendarTab() {
                 </div>
                 <div className="ml-[18px] pl-6 space-y-1.5">{items.map((e) => (
                   <div key={e.id} className="flex items-center gap-2 rounded-lg bg-surface border border-border p-2">
-                    <span className="text-[10px] font-mono text-text3 w-10 shrink-0">{e.time}</span>
+                    <span className="text-[10px] font-mono text-text3 w-14 shrink-0">{formatTime12(e.time)}</span>
                     <div className={cn("h-2 w-2 rounded-full shrink-0", e.type === "income" ? "bg-green" : "bg-red")} />
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-semibold text-text truncate">{e.description}</p>

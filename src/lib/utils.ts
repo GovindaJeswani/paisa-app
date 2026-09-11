@@ -6,7 +6,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatMoney(n: number): string {
-  return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  if (n % 1 === 0) {
+    return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  }
+  return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function formatTime12(time24: string): string {
+  if (!time24) return "";
+  const [h, m] = time24.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
 export function getGreeting(): string {

@@ -262,7 +262,7 @@ export const CATEGORIES = [
 ];
 
 export const PAYMENT_MODES = [
-  { value: "upi", label: "UPI", emoji: "💸" },
+  { value: "upi", label: "UPI", emoji: "UPI" },
   { value: "cash", label: "Cash", emoji: "💵" },
   { value: "card", label: "Card", emoji: "💳" },
   { value: "netbanking", label: "Net Banking", emoji: "🏦" },
