@@ -68,92 +68,157 @@ export async function getSettings(): Promise<Settings> {
 }
 
 // ═══════════════════════════════════════════════════════
-// SMART CATEGORY ENGINE — 200+ Indian keywords
+// SMART CATEGORY ENGINE — 300+ keywords, Hindi/Hinglish, specific emojis
 // ═══════════════════════════════════════════════════════
 
 const CATEGORY_MAP: Record<string, string> = {
-  // FOOD
-  breakfast: "🍔 Food", lunch: "🍔 Food", dinner: "🍔 Food", snack: "🍔 Food",
-  snacks: "🍔 Food", food: "🍔 Food", eat: "🍔 Food", eating: "🍔 Food",
-  biryani: "🍔 Food", pizza: "🍔 Food", burger: "🍔 Food", momos: "🍔 Food",
-  momo: "🍔 Food", dosa: "🍔 Food", thali: "🍔 Food", paratha: "🍔 Food",
-  noodles: "🍔 Food", maggi: "🍔 Food", pasta: "🍔 Food", sandwich: "🍔 Food",
-  roll: "🍔 Food", rolls: "🍔 Food", chowmein: "🍔 Food", pav: "🍔 Food",
-  vada: "🍔 Food", idli: "🍔 Food", samosa: "🍔 Food", paneer: "🍔 Food",
-  chicken: "🍔 Food", mutton: "🍔 Food", fish: "🍔 Food", egg: "🍔 Food",
-  rice: "🍔 Food", roti: "🍔 Food", naan: "🍔 Food", dal: "🍔 Food",
-  rajma: "🍔 Food", chole: "🍔 Food", puri: "🍔 Food", bhaji: "🍔 Food",
-  chaat: "🍔 Food", golgappa: "🍔 Food", bhel: "🍔 Food",
-  cake: "🍔 Food", pastry: "🍔 Food", icecream: "🍔 Food",
-  chocolate: "🍔 Food", sweet: "🍔 Food", mithai: "🍔 Food",
-  jalebi: "🍔 Food", halwa: "🍔 Food",
-  chai: "🍔 Food", tea: "🍔 Food", coffee: "🍔 Food", juice: "🍔 Food",
-  milk: "🍔 Food", lassi: "🍔 Food", smoothie: "🍔 Food", shake: "🍔 Food",
-  soda: "🍔 Food", coke: "🍔 Food", pepsi: "🍔 Food",
-  swiggy: "🍔 Food", zomato: "🍔 Food",
-  dominos: "🍔 Food", mcdonalds: "🍔 Food", kfc: "🍔 Food", subway: "🍔 Food",
-  starbucks: "🍔 Food", ccd: "🍔 Food", haldirams: "🍔 Food",
-  restaurant: "🍔 Food", dhaba: "🍔 Food", canteen: "🍔 Food", mess: "🍔 Food",
-  tiffin: "🍔 Food", dabba: "🍔 Food",
-  // TRANSPORT
-  auto: "🛺 Transport", rickshaw: "🛺 Transport", uber: "🛺 Transport",
-  ola: "🛺 Transport", cab: "🛺 Transport", taxi: "🛺 Transport",
-  bus: "🛺 Transport", metro: "🛺 Transport", train: "🛺 Transport",
-  rapido: "🛺 Transport", petrol: "🛺 Transport", fuel: "🛺 Transport",
-  diesel: "🛺 Transport", toll: "🛺 Transport", parking: "🛺 Transport",
-  flight: "🛺 Transport", fare: "🛺 Transport", ride: "🛺 Transport",
-  // SHOPPING
-  amazon: "🛒 Shopping", flipkart: "🛒 Shopping", myntra: "🛒 Shopping",
-  ajio: "🛒 Shopping", meesho: "🛒 Shopping", nykaa: "🛒 Shopping",
-  clothes: "🛒 Shopping", shoes: "🛒 Shopping", shirt: "🛒 Shopping",
-  jeans: "🛒 Shopping", dress: "🛒 Shopping", watch: "🛒 Shopping",
-  bag: "🛒 Shopping", backpack: "🛒 Shopping", perfume: "🛒 Shopping",
-  makeup: "🛒 Shopping", shopping: "🛒 Shopping", mall: "🛒 Shopping",
-  earphones: "🛒 Shopping", headphones: "🛒 Shopping", charger: "🛒 Shopping",
-  // GROCERIES
-  grocery: "🥬 Groceries", groceries: "🥬 Groceries", vegetables: "🥬 Groceries",
-  fruits: "🥬 Groceries", sabzi: "🥬 Groceries", atta: "🥬 Groceries",
-  oil: "🥬 Groceries", sugar: "🥬 Groceries", masala: "🥬 Groceries",
-  blinkit: "🥬 Groceries", zepto: "🥬 Groceries", bigbasket: "🥬 Groceries",
-  instamart: "🥬 Groceries", dmart: "🥬 Groceries", kirana: "🥬 Groceries",
-  bread: "🥬 Groceries", butter: "🥬 Groceries", curd: "🥬 Groceries",
-  // BILLS
-  recharge: "📱 Bills", wifi: "📱 Bills", internet: "📱 Bills",
-  electricity: "📱 Bills", airtel: "📱 Bills", jio: "📱 Bills",
-  vi: "📱 Bills", broadband: "📱 Bills", maintenance: "📱 Bills",
-  // RENT
-  rent: "🏠 Rent", pg: "🏠 Rent", hostel: "🏠 Rent", room: "🏠 Rent",
-  // FUN
-  movie: "🎬 Fun", movies: "🎬 Fun", cinema: "🎬 Fun", pvr: "🎬 Fun",
-  netflix: "🎬 Fun", spotify: "🎬 Fun", hotstar: "🎬 Fun",
-  game: "🎬 Fun", games: "🎬 Fun", gaming: "🎬 Fun", bowling: "🎬 Fun",
-  pool: "🎬 Fun", arcade: "🎬 Fun", concert: "🎬 Fun", ticket: "🎬 Fun",
-  party: "🎬 Fun", pub: "🎬 Fun", bar: "🎬 Fun", beer: "🎬 Fun",
-  drinks: "🎬 Fun", hookah: "🎬 Fun", outing: "🎬 Fun", trip: "🎬 Fun",
-  subscription: "🎬 Fun",
-  // EDUCATION
-  book: "📚 Education", books: "📚 Education", course: "📚 Education",
-  college: "📚 Education", tuition: "📚 Education", coaching: "📚 Education",
-  udemy: "📚 Education", stationery: "📚 Education", pen: "📚 Education",
-  xerox: "📚 Education", photocopy: "📚 Education", print: "📚 Education",
-  exam: "📚 Education", fee: "📚 Education", fees: "📚 Education",
-  // HEALTH
-  medicine: "💊 Health", doctor: "💊 Health", hospital: "💊 Health",
-  pharmacy: "💊 Health", gym: "💊 Health", fitness: "💊 Health",
-  dental: "💊 Health", "1mg": "💊 Health", pharmeasy: "💊 Health",
-  // PERSONAL
-  haircut: "💇 Personal", salon: "💇 Personal", spa: "💇 Personal",
-  grooming: "💇 Personal", laundry: "💇 Personal", ironing: "💇 Personal",
-  // GIFTS
-  gift: "🎁 Gifts", birthday: "🎁 Gifts", present: "🎁 Gifts",
-  wedding: "🎁 Gifts", shagun: "🎁 Gifts", donation: "🎁 Gifts",
-  festival: "🎁 Gifts", diwali: "🎁 Gifts", rakhi: "🎁 Gifts",
-  // EMI
-  emi: "🏦 EMI", loan: "🏦 EMI", installment: "🏦 EMI",
-  // INCOME
-  salary: "💰 Salary", income: "💰 Salary", freelance: "💻 Freelance",
-  cashback: "💸 Cashback", refund: "↩️ Refund", allowance: "🤝 Allowance",
-  interest: "🏦 Interest", stipend: "💰 Salary", bonus: "💰 Salary",
+  // ── CHAI / COFFEE / DRINKS (specific emoji) ──
+  chai: "☕ Chai/Coffee", tea: "☕ Chai/Coffee", coffee: "☕ Chai/Coffee",
+  latte: "☕ Chai/Coffee", cappuccino: "☕ Chai/Coffee", espresso: "☕ Chai/Coffee",
+  starbucks: "☕ Chai/Coffee", ccd: "☕ Chai/Coffee", "cafe coffee": "☕ Chai/Coffee",
+  barista: "☕ Chai/Coffee",
+  // Hindi
+  chaai: "☕ Chai/Coffee", chay: "☕ Chai/Coffee",
+
+  // ── FOOD — specific emojis ──
+  breakfast: "🍳 Food", lunch: "🍱 Food", dinner: "🍽️ Food",
+  snack: "🍿 Snacks", snacks: "🍿 Snacks", munchies: "🍿 Snacks",
+  nashta: "🍳 Food", khana: "🍽️ Food", khaana: "🍽️ Food",
+  bhojan: "🍽️ Food", tiffin: "🍱 Food", dabba: "🍱 Food",
+  thali: "🍱 Food", mess: "🍱 Food", canteen: "🍱 Food",
+  biryani: "🍛 Food", pulao: "🍛 Food",
+  pizza: "🍕 Food", dominos: "🍕 Food", "pizza hut": "🍕 Food",
+  burger: "🍔 Food", mcdonalds: "🍔 Food",
+  momos: "🥟 Food", momo: "🥟 Food", dumpling: "🥟 Food",
+  dosa: "🫓 Food", idli: "🫓 Food", uttapam: "🫓 Food", vada: "🫓 Food",
+  paratha: "🫓 Food", roti: "🫓 Food", naan: "🫓 Food", puri: "🫓 Food",
+  noodles: "🍜 Food", maggi: "🍜 Food", chowmein: "🍜 Food",
+  pasta: "🍝 Food",
+  samosa: "🥐 Food", kachori: "🥐 Food", pakora: "🥐 Food", pakoda: "🥐 Food",
+  chaat: "🥘 Food", golgappa: "🥘 Food", pani: "🥘 Food", bhel: "🥘 Food",
+  paneer: "🧀 Food", chicken: "🍗 Food", mutton: "🍖 Food", fish: "🐟 Food",
+  egg: "🥚 Food", anda: "🥚 Food", omelette: "🥚 Food",
+  rice: "🍚 Food", chawal: "🍚 Food", dal: "🫘 Food", rajma: "🫘 Food",
+  chole: "🫘 Food", bhaji: "🥘 Food", sabji: "🥘 Food",
+  sandwich: "🥪 Food", roll: "🌯 Food", rolls: "🌯 Food", wrap: "🌯 Food",
+  cake: "🎂 Food", pastry: "🧁 Food", icecream: "🍦 Food", ice: "🍦 Food",
+  chocolate: "🍫 Food", mithai: "🍬 Food", sweet: "🍬 Food",
+  jalebi: "🍬 Food", gulab: "🍬 Food", ladoo: "🍬 Food", halwa: "🍬 Food",
+  barfi: "🍬 Food", rasgulla: "🍬 Food",
+  juice: "🧃 Food", lassi: "🥛 Food", smoothie: "🥤 Food", shake: "🥤 Food",
+  milk: "🥛 Food", doodh: "🥛 Food", curd: "🥛 Food", dahi: "🥛 Food",
+  soda: "🥤 Food", coke: "🥤 Food", pepsi: "🥤 Food", sprite: "🥤 Food",
+  paani: "💧 Food", nimbu: "🍋 Food", shikanji: "🍋 Food",
+  swiggy: "📦 Food", zomato: "📦 Food",
+  kfc: "🍗 Food", subway: "🥪 Food", haldirams: "🍬 Food",
+  restaurant: "🍽️ Food", dhaba: "🍽️ Food", hotel: "🍽️ Food",
+  eat: "🍽️ Food", eating: "🍽️ Food", food: "🍽️ Food",
+
+  // ── TRANSPORT — specific emojis ──
+  auto: "🛺 Transport", rickshaw: "🛺 Transport", tuk: "🛺 Transport",
+  uber: "🚖 Transport", ola: "🚖 Transport", cab: "🚖 Transport", taxi: "🚖 Transport",
+  rapido: "🏍️ Transport", bike: "🏍️ Transport",
+  bus: "🚌 Transport", metro: "🚇 Transport", local: "🚇 Transport",
+  train: "🚆 Transport", irctc: "🚆 Transport", railway: "🚆 Transport",
+  flight: "✈️ Transport", hawa: "✈️ Transport",
+  petrol: "⛽ Transport", fuel: "⛽ Transport", diesel: "⛽ Transport", cng: "⛽ Transport",
+  toll: "🛣️ Transport", parking: "🅿️ Transport",
+  fare: "🛺 Transport", ride: "🛺 Transport", kiraya: "🛺 Transport",
+  redbus: "🚌 Transport", travel: "✈️ Transport", safar: "✈️ Transport",
+
+  // ── SHOPPING ──
+  amazon: "📦 Shopping", flipkart: "📦 Shopping", myntra: "👗 Shopping",
+  ajio: "👗 Shopping", meesho: "📦 Shopping", nykaa: "💄 Shopping",
+  clothes: "👕 Shopping", kapde: "👕 Shopping", shoes: "👟 Shopping",
+  jute: "👟 Shopping", chappal: "🩴 Shopping",
+  shirt: "👕 Shopping", jeans: "👖 Shopping", dress: "👗 Shopping", kurta: "👕 Shopping",
+  watch: "⌚ Shopping", bag: "🎒 Shopping", backpack: "🎒 Shopping",
+  perfume: "🧴 Shopping", makeup: "💄 Shopping", cosmetics: "💄 Shopping",
+  shopping: "🛍️ Shopping", mall: "🏬 Shopping", market: "🏪 Shopping",
+  bazaar: "🏪 Shopping", dukaan: "🏪 Shopping",
+  earphones: "🎧 Shopping", headphones: "🎧 Shopping",
+  phone: "📱 Shopping", mobile: "📱 Shopping", charger: "🔌 Shopping",
+
+  // ── GROCERIES ──
+  grocery: "🛒 Groceries", groceries: "🛒 Groceries", ration: "🛒 Groceries",
+  vegetables: "🥬 Groceries", sabzi: "🥬 Groceries",
+  fruits: "🍎 Groceries", phal: "🍎 Groceries",
+  atta: "🌾 Groceries", flour: "🌾 Groceries",
+  oil: "🫒 Groceries", tel: "🫒 Groceries",
+  sugar: "🧂 Groceries", cheeni: "🧂 Groceries", namak: "🧂 Groceries",
+  masala: "🌶️ Groceries", mirch: "🌶️ Groceries",
+  blinkit: "🛒 Groceries", zepto: "🛒 Groceries", bigbasket: "🛒 Groceries",
+  instamart: "🛒 Groceries", dmart: "🛒 Groceries",
+  kirana: "🏪 Groceries", bread: "🍞 Groceries", butter: "🧈 Groceries",
+
+  // ── BILLS ──
+  recharge: "📶 Bills", wifi: "📶 Bills", internet: "📶 Bills", broadband: "📶 Bills",
+  electricity: "💡 Bills", bijli: "💡 Bills",
+  "water bill": "💧 Bills",
+  airtel: "📶 Bills", jio: "📶 Bills", vi: "📶 Bills", bsnl: "📶 Bills",
+  maintenance: "🏢 Bills", gas: "🔥 Bills",
+
+  // ── RENT ──
+  rent: "🏠 Rent", pg: "🏠 Rent", hostel: "🏠 Rent",
+  room: "🏠 Rent", kamra: "🏠 Rent", flat: "🏠 Rent",
+
+  // ── FUN / ENTERTAINMENT ──
+  movie: "🎬 Fun", movies: "🎬 Fun", cinema: "🎬 Fun", pvr: "🎬 Fun", inox: "🎬 Fun",
+  netflix: "📺 Fun", hotstar: "📺 Fun", prime: "📺 Fun", disney: "📺 Fun",
+  spotify: "🎵 Fun", youtube: "📺 Fun",
+  game: "🎮 Fun", games: "🎮 Fun", gaming: "🎮 Fun",
+  bowling: "🎳 Fun", pool: "🎱 Fun", billiards: "🎱 Fun",
+  party: "🎉 Fun", celebration: "🎉 Fun",
+  pub: "🍺 Fun", bar: "🍺 Fun", beer: "🍺 Fun", daaru: "🍺 Fun",
+  drinks: "🍺 Fun", drink: "🍺 Fun", hookah: "💨 Fun",
+  outing: "🎡 Fun", trip: "🏖️ Fun", vacation: "🏖️ Fun", ghoomna: "🏖️ Fun",
+  subscription: "📺 Fun", masti: "🎉 Fun",
+
+  // ── EDUCATION ──
+  book: "📖 Education", books: "📖 Education", kitab: "📖 Education",
+  course: "💻 Education", coaching: "📝 Education", tuition: "📝 Education",
+  college: "🎓 Education", university: "🎓 Education", school: "🏫 Education",
+  udemy: "💻 Education", coursera: "💻 Education",
+  stationery: "✏️ Education", pen: "✏️ Education", notebook: "📓 Education",
+  xerox: "🖨️ Education", photocopy: "🖨️ Education", print: "🖨️ Education",
+  exam: "📝 Education", fee: "🎓 Education", fees: "🎓 Education",
+  padhai: "📖 Education", pariksha: "📝 Education",
+
+  // ── HEALTH ──
+  medicine: "💊 Health", dawai: "💊 Health", doctor: "👨‍⚕️ Health",
+  hospital: "🏥 Health", aspatal: "🏥 Health",
+  pharmacy: "💊 Health", medical: "🏥 Health",
+  gym: "🏋️ Health", fitness: "🏋️ Health", kasrat: "🏋️ Health",
+  yoga: "🧘 Health",
+  dental: "🦷 Health", dentist: "🦷 Health",
+  "1mg": "💊 Health", pharmeasy: "💊 Health", apollo: "🏥 Health",
+
+  // ── PERSONAL ──
+  haircut: "💈 Personal", salon: "💈 Personal", parlour: "💈 Personal",
+  nai: "💈 Personal", baal: "💈 Personal",
+  spa: "💆 Personal", massage: "💆 Personal", malish: "💆 Personal",
+  laundry: "👔 Personal", dhobi: "👔 Personal", ironing: "👔 Personal",
+  grooming: "💈 Personal",
+
+  // ── GIFTS ──
+  gift: "🎁 Gifts", tohfa: "🎁 Gifts", birthday: "🎂 Gifts",
+  wedding: "💒 Gifts", shaadi: "💒 Gifts", shagun: "🧧 Gifts",
+  donation: "🙏 Gifts", daan: "🙏 Gifts",
+  festival: "🪔 Gifts", diwali: "🪔 Gifts", holi: "🎨 Gifts",
+  rakhi: "🧶 Gifts", eid: "🌙 Gifts",
+  temple: "🛕 Gifts", mandir: "🛕 Gifts", masjid: "🕌 Gifts",
+  gurudwara: "⛩️ Gifts", church: "⛪ Gifts",
+
+  // ── EMI / LOANS ──
+  emi: "🏦 EMI", loan: "🏦 EMI", karz: "🏦 EMI",
+  installment: "🏦 EMI", "credit card": "💳 EMI", "card bill": "💳 EMI",
+
+  // ── INCOME ──
+  salary: "💰 Salary", tankhah: "💰 Salary", income: "💰 Salary",
+  freelance: "💻 Freelance", cashback: "💸 Cashback",
+  refund: "↩️ Refund", wapsi: "↩️ Refund",
+  allowance: "🤝 Allowance", "pocket money": "🤝 Allowance",
+  stipend: "💰 Salary", bonus: "💰 Salary", inam: "💰 Salary",
 };
 
 export function guessCategory(text: string): string {
@@ -176,34 +241,33 @@ export function getCategoryName(c: string): string { return c.replace(/^[^\s]+\s
 export function normalizeCategoryForChart(c: string): string { return getCategoryName(c); }
 
 export const QUICK_CATEGORIES = [
-  { emoji: "🍔", label: "Food", cat: "🍔 Food" },
+  { emoji: "🍽️", label: "Food", cat: "🍽️ Food" },
+  { emoji: "☕", label: "Chai", cat: "☕ Chai/Coffee" },
+  { emoji: "🍿", label: "Snacks", cat: "🍿 Snacks" },
   { emoji: "🛺", label: "Auto/Cab", cat: "🛺 Transport" },
-  { emoji: "🛒", label: "Shopping", cat: "🛒 Shopping" },
-  { emoji: "📱", label: "Bills", cat: "📱 Bills" },
+  { emoji: "🛍️", label: "Shopping", cat: "🛍️ Shopping" },
+  { emoji: "📶", label: "Bills", cat: "📶 Bills" },
   { emoji: "🏠", label: "Rent", cat: "🏠 Rent" },
   { emoji: "🎬", label: "Fun", cat: "🎬 Fun" },
-  { emoji: "🥬", label: "Groceries", cat: "🥬 Groceries" },
-  { emoji: "📚", label: "Education", cat: "📚 Education" },
+  { emoji: "🛒", label: "Groceries", cat: "🛒 Groceries" },
+  { emoji: "📖", label: "Education", cat: "📖 Education" },
   { emoji: "💊", label: "Health", cat: "💊 Health" },
-  { emoji: "💇", label: "Personal", cat: "💇 Personal" },
-  { emoji: "🎁", label: "Gifts", cat: "🎁 Gifts" },
-  { emoji: "🏦", label: "EMI", cat: "🏦 EMI" },
+  { emoji: "💈", label: "Personal", cat: "💈 Personal" },
 ];
 
 export const CATEGORIES = [
-  "🍔 Food", "🛺 Transport", "🛒 Shopping", "📱 Bills",
-  "🏠 Rent", "🎬 Fun", "🥬 Groceries", "📚 Education",
-  "💊 Health", "💇 Personal", "🎁 Gifts", "🏦 EMI", "📦 Other",
+  "🍽️ Food", "☕ Chai/Coffee", "🍿 Snacks", "🛺 Transport", "🛍️ Shopping",
+  "📶 Bills", "🏠 Rent", "🎬 Fun", "🛒 Groceries", "📖 Education",
+  "💊 Health", "💈 Personal", "🎁 Gifts", "🏦 EMI", "📦 Other",
 ];
 
 export const PAYMENT_MODES = [
-  { value: "upi", label: "UPI", emoji: "📱" },
+  { value: "upi", label: "UPI", emoji: "💸" },
   { value: "cash", label: "Cash", emoji: "💵" },
   { value: "card", label: "Card", emoji: "💳" },
   { value: "netbanking", label: "Net Banking", emoji: "🏦" },
   { value: "wallet", label: "Wallet", emoji: "👛" },
 ] as const;
-
 // ── Notification/reminder tips ──
 export const REMINDER_MESSAGES = [
   "💸 Don't forget to log today's expenses!",

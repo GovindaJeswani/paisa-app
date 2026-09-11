@@ -986,7 +986,7 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-text3 font-bold">₹</span>
-                    <input ref={amountRef} type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0"
+                    <input ref={amountRef} type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" value={amount} onChange={(e) => { const v = e.target.value; if (/^\d*\.?\d*$/.test(v)) setAmount(v); }} placeholder="0"
                       className="w-full rounded-xl border border-border bg-surface2 pl-10 pr-4 py-4 text-2xl font-extrabold text-text tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/20" />
                   </div>
                   {/* Camera button for receipt */}
@@ -1115,7 +1115,7 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
 
-              <button onClick={handleSave} disabled={saving || !amount || parseFloat(amount) <= 0}
+              <button onClick={handleSave} disabled={saving || !amount || !(parseFloat(amount) > 0)}
                 className={cn("w-full rounded-xl py-3.5 text-sm font-bold text-white disabled:opacity-40 active:scale-[0.98] transition-all",
                   isIncome ? "bg-green hover:bg-green/90" : "bg-accent hover:bg-accent/90")}>
                 {saving ? "Saving..." : isIncome ? "Add Income" : "Add Expense"}
