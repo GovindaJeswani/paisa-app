@@ -31,35 +31,16 @@ export function isFirebaseConfigured(): boolean {
 export async function signInWithGoogle(): Promise<User | null> {
   if (!auth || !googleProvider) return null;
   try {
-    // Try popup first (works on desktop and most browsers)
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (err: unknown) {
-    const error = err as { code?: string };
-    // If popup blocked (common on mobile/WebView), try redirect
-    if (error.code === "auth/popup-blocked" || error.code === "auth/popup-closed-by-user" || error.code === "auth/cancelled-popup-request") {
-      try {
-        await signInWithRedirect(auth, googleProvider);
-        return null; // Will redirect, result handled on page load
-      } catch (redirectErr) {
-        console.error("Google redirect sign-in failed:", redirectErr);
-        return null;
-      }
-    }
     console.error("Google sign-in failed:", err);
     return null;
   }
 }
 
-// Check for redirect result on page load
 export async function checkRedirectResult(): Promise<User | null> {
-  if (!auth) return null;
-  try {
-    const result = await getRedirectResult(auth);
-    return result?.user || null;
-  } catch {
-    return null;
-  }
+  return null; // Disabled — popup only
 }
 
 export async function signOutUser(): Promise<void> {
