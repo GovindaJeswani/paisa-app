@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false,
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#6366F1" },
     { media: "(prefers-color-scheme: dark)", color: "#0F172A" },
@@ -21,7 +22,7 @@ export const viewport: Viewport = {
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geist.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="min-h-full bg-bg text-text">
+      <body className="min-h-full bg-bg text-text safe-area">
         <div className="mx-auto max-w-lg min-h-screen flex flex-col">
           {children}
         </div>

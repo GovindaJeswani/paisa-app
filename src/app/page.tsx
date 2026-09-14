@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { db, guessCategory, isIncomeKeyword, QUICK_CATEGORIES, CATEGORIES, getCategoryEmoji, getCategoryName, normalizeCategoryForChart, initSettings, getSettings, PAYMENT_MODES, FUN_FACTS, type Expense, type FriendSplit } from "@/lib/db";
 import { cn, formatMoney, formatTime12, getGreeting, toDateStr, friendlyDate } from "@/lib/utils";
-import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured } from "@/lib/firebase";
+import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured, checkRedirectResult } from "@/lib/firebase";
 import { FriendSplitSection } from "@/components/splits";
 import { ReportSheet } from "@/components/report";
 import type { User } from "firebase/auth";
@@ -58,6 +58,8 @@ export default function Home() {
   // Auth listener
   useEffect(() => {
     const unsub = onAuthChange((u) => setUser(u));
+    // Check for redirect result (mobile Google login)
+    checkRedirectResult().then((u) => { if (u) setUser(u); });
     return unsub;
   }, []);
 
