@@ -16,6 +16,7 @@
 
 import type { Expense } from "./db";
 import type { TransactionClassification } from "./categories";
+import { resolveLegacyCategory, getCategoryById } from "./categories";
 
 // ============================================================
 // CLASSIFICATION
@@ -138,9 +139,6 @@ export function calculateSummary(expenses: Expense[]): FinancialSummary {
 
 /** Group expenses by parent category, aggregating subcategories. */
 export function groupByParentCategory(expenses: Expense[]): Map<string, { total: number; count: number; subcategories: Map<string, { total: number; count: number }> }> {
-  // Import dynamically to avoid circular deps
-  const { resolveLegacyCategory, getCategoryById, CATEGORY_REGISTRY } = require("./categories");
-
   const groups = new Map<string, { total: number; count: number; subcategories: Map<string, { total: number; count: number }> }>();
 
   for (const exp of expenses) {
