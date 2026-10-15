@@ -15,6 +15,8 @@ import { FriendSplitSection } from "@/components/splits";
 import { ReportSheet } from "@/components/report";
 import { CommitmentHomeSummary, AddCommitmentSheet } from "@/components/commitments";
 import { LendingHomeSummary } from "@/components/lending";
+import { InvestmentSheet } from "@/components/investments";
+import { WeeklyAnalyticsSheet } from "@/components/weekly-analytics";
 import type { User } from "firebase/auth";
 
 // ── init DB settings on load + request notification permission ──
@@ -54,6 +56,8 @@ export default function Home() {
   const [showReport, setShowReport] = useState(false);
   const [showSplit, setShowSplit] = useState(false);
   const [showCommitment, setShowCommitment] = useState(false);
+  const [showInvestments, setShowInvestments] = useState(false);
+  const [showWeeklyAnalytics, setShowWeeklyAnalytics] = useState(false);
   const [tab, setTab] = useState<"home" | "calendar">("home");
   const [user, setUser] = useState<User | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -96,7 +100,7 @@ export default function Home() {
 
   return (
     <>
-      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} onSearch={() => setShowSearch(true)} onSettings={() => setShowSettings(true)} onReport={() => setShowReport(true)} user={user} syncing={syncing} onSync={handleSync} /> : <CalendarTab />}
+      {tab === "home" ? <HomeTab onSMS={() => setShowSMS(true)} onSearch={() => setShowSearch(true)} onSettings={() => setShowSettings(true)} onReport={() => setShowReport(true)} onInvestments={() => setShowInvestments(true)} onWeeklyAnalytics={() => setShowWeeklyAnalytics(true)} onCommitment={() => setShowCommitment(true)} user={user} syncing={syncing} onSync={handleSync} /> : <CalendarTab />}
 
       {/* Bottom nav */}
       <nav className="sticky bottom-0 border-t border-border bg-surface/80 backdrop-blur-xl flex safe-b">
@@ -126,6 +130,8 @@ export default function Home() {
       {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
       {showReport && <ReportSheet onClose={() => setShowReport(false)} />}
       {showCommitment && <AddCommitmentSheet onClose={() => setShowCommitment(false)} />}
+      {showInvestments && <InvestmentSheet onClose={() => setShowInvestments(false)} />}
+      {showWeeklyAnalytics && <WeeklyAnalyticsSheet onClose={() => setShowWeeklyAnalytics(false)} />}
     </>
   );
 }
@@ -232,7 +238,7 @@ function CollapsibleDay({ date, items, daySpent, dayIncome, defaultOpen }: {
   );
 }
 
-function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync }: { onSMS: () => void; onSearch: () => void; onSettings: () => void; onReport: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
+function HomeTab({ onSMS, onSearch, onSettings, onReport, onInvestments, onWeeklyAnalytics, onCommitment, user, syncing, onSync }: { onSMS: () => void; onSearch: () => void; onSettings: () => void; onReport: () => void; onInvestments: () => void; onWeeklyAnalytics: () => void; onCommitment: () => void; user: User | null; syncing: boolean; onSync: () => void }) {
   const now = new Date();
   const [sortOrder, setSortOrder] = useState<"time" | "amount_high" | "amount_low">("time");
   const [filterCat, setFilterCat] = useState<string | null>(null);
@@ -439,6 +445,25 @@ function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync 
         </div>
         <ChevronRight size={14} className="text-accent" />
       </button>
+
+      {/* Quick action buttons */}
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <button onClick={onInvestments}
+          className="flex items-center gap-1.5 rounded-xl border border-green/20 bg-green-bg/50 p-2.5 hover:bg-green-bg transition-colors">
+          <TrendingUp size={14} className="text-green" />
+          <span className="text-[10px] font-bold text-green">Investments</span>
+        </button>
+        <button onClick={onWeeklyAnalytics}
+          className="flex items-center gap-1.5 rounded-xl border border-accent/20 bg-accent-bg/50 p-2.5 hover:bg-accent-bg transition-colors">
+          <Target size={14} className="text-accent" />
+          <span className="text-[10px] font-bold text-accent">Weekly</span>
+        </button>
+        <button onClick={onCommitment}
+          className="flex items-center gap-1.5 rounded-xl border border-orange/20 bg-orange-bg/50 p-2.5 hover:bg-orange-bg transition-colors">
+          <Repeat size={14} className="text-orange" />
+          <span className="text-[10px] font-bold text-orange">+ Recurring</span>
+        </button>
+      </div>
 
       {/* Daily money tip */}
       <DailyTip />

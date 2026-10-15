@@ -46,3 +46,24 @@ export function friendlyDate(dateStr: string): string {
   if (dateStr === yesterday) return "Yesterday";
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 }
+
+
+// Week helpers
+export function getWeekRange(offset: number = 0): { start: string; end: string; dates: string[] } {
+  const now = new Date();
+  const baseDate = new Date(now.getTime() + offset * 7 * 86400000);
+  const dow = baseDate.getDay() === 0 ? 6 : baseDate.getDay() - 1;
+  const monday = new Date(baseDate.getTime() - dow * 86400000);
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday.getTime() + i * 86400000);
+    return toDateStr(d);
+  });
+  return { start: dates[0], end: dates[6], dates };
+}
+
+export function getMonthRange(year: number, month: number): { start: string; end: string } {
+  const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const end = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  return { start, end };
+}

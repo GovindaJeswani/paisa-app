@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Download, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, X, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Lightbulb } from "lucide-react";
 import { db, getCategoryEmoji, getCategoryName, normalizeCategoryForChart, PAYMENT_MODES, type Expense } from "@/lib/db";
 import { cn, formatMoney, toDateStr } from "@/lib/utils";
+import { calculateSummary } from "@/lib/calculations";
 
 export function ReportSheet({ onClose }: { onClose: () => void }) {
   const [monthOffset, setMonthOffset] = useState(0); // 0 = current, -1 = last, etc.
@@ -28,6 +29,9 @@ export function ReportSheet({ onClose }: { onClose: () => void }) {
   const totalIncome = expenses.filter((e) => e.type === "income").reduce((s, e) => s + e.amount, 0);
   const prevSpent = prevExpenses.filter((e) => e.type === "expense").reduce((s, e) => s + e.amount, 0);
   const expenseCount = expenses.filter((e) => e.type === "expense").length;
+
+  // Financial summary with proper classification
+  const financialSummary = useMemo(() => calculateSummary(expenses), [expenses]);
 
   // Category breakdown
   const catBreakdown = useMemo(() => {
@@ -185,6 +189,41 @@ ${prevSpent > 0 ? `<h2>vs Previous Month</h2><p style="font-size:13px">Previous:
               <p className="text-lg font-extrabold text-text tabular-nums">{formatMoney(avgDaily)}</p>
             </div>
           </div>
+
+          {/* Investment & Savings breakdown (if any) */}
+          {(financialSummary.totalInvestments > 0 || financialSummary.totalSavings > 0 || financialSummary.totalCreditCardBills > 0) && (
+            <div className="grid grid-cols-3 gap-2">
+              {financialSummary.totalInvestments > 0 && (
+                <div className="rounded-xl border border-green/20 bg-green-bg/50 p-2.5 text-center">
+                  <p className="text-[8px] font-bold text-green uppercase">Invested</p>
+                  <p className="text-sm font-extrabold text-green tabular-nums">{formatMoney(financialSummary.totalInvestments)}</p>
+                </div>
+              )}
+              {financialSummary.totalSavings > 0 && (
+                <div className="rounded-xl border border-accent/20 bg-accent-bg/50 p-2.5 text-center">
+                  <p className="text-[8px] font-bold text-accent uppercase">Savings</p>
+                  <p className="text-sm font-extrabold text-accent tabular-nums">{formatMoney(financialSummary.totalSavings)}</p>
+                </div>
+              )}
+              {financialSummary.totalCreditCardBills > 0 && (
+                <div className="rounded-xl border border-orange/20 bg-orange-bg/50 p-2.5 text-center">
+                  <p className="text-[8px] font-bold text-orange uppercase">CC Bills</p>
+                  <p className="text-sm font-extrabold text-orange tabular-nums">{formatMoney(financialSummary.totalCreditCardBills)}</p>
+                  <p className="text-[7px] text-text3">not double-counted</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Savings rate (if income exists) */}
+          {totalIncome > 0 && financialSummary.totalSavings > 0 && (
+            <div className="rounded-xl bg-accent-bg/50 border border-accent/10 p-3 text-center">
+              <p className="text-[10px] font-bold text-accent">
+                💰 Savings Rate: {Math.round((financialSummary.totalSavings / totalIncome) * 100)}%
+              </p>
+              <p className="text-[9px] text-text3 mt-0.5">Savings ÷ Income = {formatMoney(financialSummary.totalSavings)} ÷ {formatMoney(totalIncome)}</p>
+            </div>
+          )}
 
           {/* vs Last month */}
           {prevSpent > 0 && (
