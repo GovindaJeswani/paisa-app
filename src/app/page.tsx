@@ -13,6 +13,8 @@ import { cn, formatMoney, formatTime12, getGreeting, toDateStr, friendlyDate } f
 import { signInWithGoogle, signOutUser, onAuthChange, getCurrentUser, syncToCloud, syncFromCloud, syncExpenseToCloud, deleteExpenseFromCloud, listenToCloudChanges, isFirebaseConfigured, checkRedirectResult } from "@/lib/firebase";
 import { FriendSplitSection } from "@/components/splits";
 import { ReportSheet } from "@/components/report";
+import { CommitmentHomeSummary, AddCommitmentSheet } from "@/components/commitments";
+import { LendingHomeSummary } from "@/components/lending";
 import type { User } from "firebase/auth";
 
 // ── init DB settings on load + request notification permission ──
@@ -51,6 +53,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showSplit, setShowSplit] = useState(false);
+  const [showCommitment, setShowCommitment] = useState(false);
   const [tab, setTab] = useState<"home" | "calendar">("home");
   const [user, setUser] = useState<User | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -122,6 +125,7 @@ export default function Home() {
       {showSearch && <SearchSheet onClose={() => setShowSearch(false)} />}
       {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
       {showReport && <ReportSheet onClose={() => setShowReport(false)} />}
+      {showCommitment && <AddCommitmentSheet onClose={() => setShowCommitment(false)} />}
     </>
   );
 }
@@ -419,6 +423,12 @@ function HomeTab({ onSMS, onSearch, onSettings, onReport, user, syncing, onSync 
 
       {/* Friend splits — who owes who */}
       <FriendSplitSection />
+
+      {/* Recurring commitments — rent, SIPs, bills */}
+      <CommitmentHomeSummary />
+
+      {/* Lending & Borrowing */}
+      <LendingHomeSummary />
 
       {/* SMS import */}
       <button onClick={onSMS}
@@ -843,6 +853,7 @@ function CalendarTab() {
   const [view, setView] = useState<CalView>("month");
   const [month, setMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, etc.
 
   const y = month.getFullYear(), m = month.getMonth();
   const startDate = `${y}-${String(m + 1).padStart(2, "0")}-01`;
@@ -868,17 +879,18 @@ function CalendarTab() {
   const offset = firstDay === 0 ? 6 : firstDay - 1;
   const days: (number | null)[] = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
-  // Week view
+  // Week view — supports navigation via weekOffset
   const weekDays = useMemo(() => {
-    const nowDate = new Date();
-    const dow = nowDate.getDay() === 0 ? 6 : nowDate.getDay() - 1;
+    const baseDate = new Date();
+    baseDate.setDate(baseDate.getDate() + weekOffset * 7);
+    const dow = baseDate.getDay() === 0 ? 6 : baseDate.getDay() - 1; // Monday = 0
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(nowDate.getTime() - (dow - i) * 86400000);
+      const d = new Date(baseDate.getTime() - (dow - i) * 86400000);
       const ds = toDateStr(d);
       const dayExp = expenses.filter((e) => e.date === ds);
-      return { date: ds, dayName: d.toLocaleDateString("en-IN", { weekday: "short" }), dayNum: d.getDate(), expenses: dayExp, total: dayExp.filter((e) => e.type === "expense").reduce((s, e) => s + e.amount, 0) };
+      return { date: ds, dayName: d.toLocaleDateString("en-IN", { weekday: "short" }), dayNum: d.getDate(), monthName: d.toLocaleDateString("en-IN", { month: "short" }), expenses: dayExp, total: dayExp.filter((e) => e.type === "expense").reduce((s, e) => s + e.amount, 0) };
     });
-  }, [expenses]);
+  }, [expenses, weekOffset]);
 
   // Timeline
   const timeline = useMemo(() => {
@@ -936,7 +948,30 @@ function CalendarTab() {
       )}
 
       {view === "week" && (
-        <div className="space-y-2">{weekDays.map((d) => {
+        <>
+          {/* Week navigation */}
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={() => setWeekOffset((o) => o - 1)} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-surface2">
+              <ChevronLeft size={16} className="text-text2" />
+            </button>
+            <div className="text-center">
+              <p className="text-xs font-bold text-text">
+                {weekDays[0]?.dayNum} {weekDays[0]?.monthName} — {weekDays[6]?.dayNum} {weekDays[6]?.monthName}
+              </p>
+              <p className="text-[10px] text-text3">
+                Spent: <span className="font-bold text-red tabular-nums">{formatMoney(weekDays.reduce((s, d) => s + d.total, 0))}</span>
+              </p>
+            </div>
+            <div className="flex gap-1">
+              {weekOffset !== 0 && (
+                <button onClick={() => setWeekOffset(0)} className="px-2 py-1 text-[10px] font-semibold text-accent hover:bg-accent-bg rounded-lg">Today</button>
+              )}
+              <button onClick={() => setWeekOffset((o) => o + 1)} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-surface2">
+                <ChevronRight size={16} className="text-text2" />
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">{weekDays.map((d) => {
           const isT = d.date === today;
           return (
             <div key={d.date} className={cn("rounded-xl border p-3", isT ? "border-accent bg-accent-bg" : "border-border bg-surface")}>
@@ -957,6 +992,7 @@ function CalendarTab() {
             </div>
           );
         })}</div>
+        </>
       )}
 
       {view === "timeline" && (

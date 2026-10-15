@@ -15,6 +15,13 @@ export interface Expense {
   recurringDay?: number;
   tags?: string[];
   createdAt: string;
+  // V5 fields (optional for backward compat)
+  categoryId?: string;         // new category system ID
+  subcategoryId?: string;
+  parentCategory?: string;     // parent category ID for grouping
+  classification?: string;     // expense | income | transfer | investment | savings | credit_card_bill | loan_emi | lending | borrowing
+  linkedCommitmentId?: string; // links to a recurring commitment
+  linkedLoanId?: string;       // links to a loan record
 }
 
 export interface FriendSplit {
@@ -25,6 +32,7 @@ export interface FriendSplit {
   date: string;
   settled: boolean;
   createdAt: string;
+  linkedLoanId?: string;   // V5: link to a loan for conversion
 }
 
 export interface Settings {
@@ -33,15 +41,131 @@ export interface Settings {
   dailyBudget: number;
   reminderEnabled: boolean;
   defaultPaymentMode: string;
+  hiddenHomeSections?: string[];  // V5: sections user has hidden
+}
+
+// ── V5: Recurring Commitments ──
+export type CommitmentFrequency = "weekly" | "monthly" | "bimonthly" | "quarterly" | "halfyearly" | "yearly" | "custom";
+export type CommitmentType = "bill" | "subscription" | "emi" | "sip" | "insurance" | "rent" | "other";
+export type OccurrenceStatus = "upcoming" | "due_soon" | "paid" | "overdue" | "skipped" | "paused";
+
+export interface Commitment {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string;
+  type: CommitmentType;
+  frequency: CommitmentFrequency;
+  customIntervalDays?: number;
+  startDate: string;
+  dueDay?: number;         // day of month (1-31)
+  dueWindowStart?: number; // e.g. 1 (1st of month)
+  dueWindowEnd?: number;   // e.g. 5 (5th of month)
+  accountLabel?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CommitmentOccurrence {
+  id: string;
+  commitmentId: string;
+  dueDate: string;
+  status: OccurrenceStatus;
+  paidDate?: string;
+  paidAmount?: number;
+  linkedTransactionId?: string; // link to expense record
+  notes?: string;
+  createdAt: string;
+}
+
+// ── V5: Lending & Borrowing ──
+export type LoanType = "lent" | "borrowed";
+export type LoanStatus = "outstanding" | "partially_repaid" | "settled";
+
+export interface Loan {
+  id: string;
+  personName: string;
+  type: LoanType;          // lent = they owe me, borrowed = I owe them
+  originalAmount: number;
+  outstandingAmount: number;
+  description: string;
+  date: string;
+  expectedRepayDate?: string;
+  status: LoanStatus;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface LoanRepayment {
+  id: string;
+  loanId: string;
+  amount: number;
+  date: string;
+  notes?: string;
+  createdAt: string;
+}
+
+// ── V5: Investment Tracking ──
+export type InvestmentType = "sip" | "ipo" | "stock" | "mutual_fund" | "fd" | "rd" | "gold" | "other";
+export type IPOStatus = "planned" | "applied" | "amount_blocked" | "allotted" | "partially_allotted" | "not_allotted" | "refund_pending" | "refunded" | "listed" | "cancelled";
+
+export interface Investment {
+  id: string;
+  type: InvestmentType;
+  name: string;
+  amount: number;          // amount invested / applied
+  date: string;
+  // SIP fields
+  frequency?: CommitmentFrequency;
+  scheduledDay?: number;
+  // IPO fields
+  ipoStatus?: IPOStatus;
+  amountBlocked?: number;
+  amountAllotted?: number;
+  refundAmount?: number;
+  listingDate?: string;
+  // Stock fields
+  symbol?: string;
+  quantity?: number;
+  buyPrice?: number;
+  sellPrice?: number;
+  sellDate?: string;
+  charges?: number;
+  // Common
+  accountLabel?: string;
+  notes?: string;
+  status: string;
+  createdAt: string;
+}
+
+// ── V5: Custom Categories ──
+export interface CustomCategory {
+  id: string;
+  name: string;
+  parentId?: string;       // parent category ID
+  icon: string;            // Lucide icon name
+  color: string;
+  isFavorite: boolean;
+  sortOrder: number;
+  createdAt: string;
 }
 
 class PaisaDB extends Dexie {
   expenses!: Table<Expense, string>;
   settings!: Table<Settings, string>;
   splits!: Table<FriendSplit, string>;
+  commitments!: Table<Commitment, string>;
+  occurrences!: Table<CommitmentOccurrence, string>;
+  loans!: Table<Loan, string>;
+  loanRepayments!: Table<LoanRepayment, string>;
+  investments!: Table<Investment, string>;
+  customCategories!: Table<CustomCategory, string>;
 
   constructor() {
     super("PaisaSimple");
+
+    // V4: original schema (keep for users who haven't upgraded yet)
     this.version(4).stores({
       expenses: "id, date, category, type, createdAt, isRecurring",
       settings: "id",
@@ -51,6 +175,19 @@ class PaisaDB extends Dexie {
         if (!exp.type) exp.type = "expense";
         if (!exp.paymentMode) exp.paymentMode = "upi";
       });
+    });
+
+    // V5: add new tables + new indexes, preserve all existing data
+    this.version(5).stores({
+      expenses: "id, date, category, type, createdAt, isRecurring, categoryId, parentCategory, classification",
+      settings: "id",
+      splits: "id, friendName, settled, date, linkedLoanId",
+      commitments: "id, type, categoryId, isActive",
+      occurrences: "id, commitmentId, dueDate, status",
+      loans: "id, personName, type, status, date",
+      loanRepayments: "id, loanId, date",
+      investments: "id, type, status, date",
+      customCategories: "id, parentId, isFavorite, sortOrder",
     });
   }
 }
